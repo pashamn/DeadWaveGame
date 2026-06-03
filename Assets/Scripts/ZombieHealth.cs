@@ -21,7 +21,7 @@ public class ZombieHealth : MonoBehaviour
 
     void Update()
     {
-        // TEST DAMAGE
+        // TEST DAMAGE (Bisa dihapus jika sudah tidak digunakan untuk testing)
         if (Input.GetKeyDown(KeyCode.K))
         {
             TakeDamage(25);
@@ -50,8 +50,25 @@ public class ZombieHealth : MonoBehaviour
 
     void Die()
     {
+        if (IsDead) return; // Pengaman ganda agar tidak mati dua kali
+        
         IsDead = true;
 
-        zombieAI.Die();
+        // 1. Eksekusi logika mati bawaan AI zombie Anda (misal menghentikan navmesh/pergerakan)
+        if (zombieAI != null)
+        {
+            zombieAI.Die();
+        }
+
+        // 2. BARU: Perintahkan ZombieSpawner untuk menjatuhkan Kristal EXP/Score di titik kematian ini
+        if (ZombieSpawner.Instance != null)
+        {
+            ZombieSpawner.Instance.DropLootCrystal(transform.position);
+        }
+
+        // 3. BARU: Hancurkan objek zombie dari arena permainan
+        // Jika zombie Anda punya animasi mati ("die"), Anda bisa memberi jeda waktu hancur, misal: Destroy(gameObject, 2f);
+        // Jika tidak ada atau ingin instan hilang, gunakan baris di bawah ini:
+        Destroy(gameObject);
     }
 }
