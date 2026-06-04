@@ -15,7 +15,7 @@ public class ZombieAI : MonoBehaviour
     public float attackDistance = 2f;
     public float attackCooldown = 1.5f;
     public int damage = 10;
-    
+
     [Header("Roaming")]
     public float roamRadius = 5f;
     public float roamTimer = 4f;
@@ -27,6 +27,29 @@ public class ZombieAI : MonoBehaviour
 
     private float nextUpdateTime;
     private float nextAttackTime;
+
+    [Header("Audio")]
+    public AudioSource audioSource;
+
+    public AudioClip idleSound;
+    public AudioClip chaseSound;
+    public AudioClip attackSound;
+
+    private AudioClip currentClip;
+
+    [Header("Volume Settings")]
+    [Range(0f, 1f)]
+    public float idleVolume = 0.2f;
+
+    [Range(0f, 1f)]
+    public float chaseVolume = 0.7f;
+
+    [Range(0f, 1f)]
+    public float attackVolume = 1f;
+
+    [Header("3D Audio")]
+    public float minAudioDistance = 3f;
+    public float maxAudioDistance = 30f;
 
     public enum ZombieState
     {
@@ -44,16 +67,35 @@ public class ZombieAI : MonoBehaviour
         animator = GetComponent<Animator>();
         health = GetComponent<ZombieHealth>();
 
-        // Cari player otomatis
-        player = GameObject.FindGameObjectWithTag("Player").transform;
+        if (audioSource == null)
+            audioSource = GetComponent<AudioSource>();
+
+        if (audioSource != null)
+        {
+            audioSource.playOnAwake = false;
+            audioSource.loop = false;
+
+            // Audio 3D
+            audioSource.spatialBlend = 1f;
+            audioSource.minDistance = minAudioDistance;
+            audioSource.maxDistance = maxAudioDistance;
+            audioSource.rolloffMode = AudioRolloffMode.Logarithmic;
+        }
+
+        GameObject playerObj =
+            GameObject.FindGameObjectWithTag("Player");
+
+        if (playerObj != null)
+        {
+            player = playerObj.transform;
+        }
 
         currentState = ZombieState.Idle;
     }
 
     void Update()
     {
-        // Stop semua AI jika zombie mati
-        if (health.IsDead)
+        if (health.IsDead || player == null)
             return;
 
         float distanceSqr =
@@ -67,15 +109,16 @@ public class ZombieAI : MonoBehaviour
 
         switch (currentState)
         {
-           case ZombieState.Idle:
+            case ZombieState.Idle:
+
+                PlayStateSound(idleSound, idleVolume);
+
                 animator.SetBool("isRunning", true);
                 animator.SetBool("isAttacking", false);
 
-                // Roaming random
                 if (Time.time >= nextRoamTime)
                 {
-                    nextRoamTime =
-                        Time.time + roamTimer;
+                    nextRoamTime = Time.time + roamTimer;
 
                     Vector3 randomPosition =
                         transform.position +
@@ -87,7 +130,6 @@ public class ZombieAI : MonoBehaviour
 
                     NavMeshHit hit;
 
-                    // Cari posisi valid di NavMesh
                     if (NavMesh.SamplePosition(
                         randomPosition,
                         out hit,
@@ -98,7 +140,6 @@ public class ZombieAI : MonoBehaviour
                     }
                 }
 
-                // Jika player dekat → chase
                 if (distanceSqr <= chaseDistanceSqr)
                 {
                     currentState = ZombieState.Chase;
@@ -108,10 +149,11 @@ public class ZombieAI : MonoBehaviour
 
             case ZombieState.Chase:
 
+                PlayStateSound(chaseSound, chaseVolume);
+
                 animator.SetBool("isRunning", true);
                 animator.SetBool("isAttacking", false);
 
-                // Update path tidak setiap frame
                 if (Time.time >= nextUpdateTime)
                 {
                     nextUpdateTime =
@@ -120,7 +162,6 @@ public class ZombieAI : MonoBehaviour
                     agent.SetDestination(player.position);
                 }
 
-                // Jika dekat player → attack
                 if (distanceSqr <= attackDistanceSqr)
                 {
                     currentState = ZombieState.Attack;
@@ -135,7 +176,6 @@ public class ZombieAI : MonoBehaviour
                 animator.SetBool("isRunning", false);
                 animator.SetBool("isAttacking", true);
 
-                // Menghadap player
                 Vector3 lookPos = new Vector3(
                     player.position.x,
                     transform.position.y,
@@ -144,17 +184,13 @@ public class ZombieAI : MonoBehaviour
 
                 transform.LookAt(lookPos);
 
-                // Jika player menjauh
                 if (distanceSqr > attackDistanceSqr)
                 {
                     animator.SetBool("isAttacking", false);
-
                     currentState = ZombieState.Chase;
-
                     return;
                 }
 
-                // Cooldown attack
                 if (Time.time >= nextAttackTime)
                 {
                     Attack();
@@ -167,12 +203,42 @@ public class ZombieAI : MonoBehaviour
         }
     }
 
+    void PlayStateSound(AudioClip clip, float volume)
+    {
+        if (audioSource == null || clip == null)
+            return;
+
+        if (currentClip == clip)
+            return;
+
+        currentClip = clip;
+
+        audioSource.Stop();
+        audioSource.clip = clip;
+        audioSource.loop = true;
+        audioSource.volume = volume;
+
+        // Pitch random supaya tiap zombie tidak identik
+        audioSource.pitch = Random.Range(0.9f, 1.1f);
+
+        audioSource.Play();
+    }
+
     void Attack()
     {
         nextAttackTime =
             Time.time + attackCooldown;
 
         Debug.Log("Zombie Attack");
+
+        if (audioSource != null &&
+            attackSound != null)
+        {
+            audioSource.PlayOneShot(
+                attackSound,
+                attackVolume
+            );
+        }
 
         PlayerHealth playerHealth =
             player.GetComponent<PlayerHealth>();
@@ -187,10 +253,18 @@ public class ZombieAI : MonoBehaviour
     {
         currentState = ZombieState.Dead;
 
+        if (audioSource != null)
+        {
+            audioSource.Stop();
+        }
+
         animator.SetBool("isRunning", false);
         animator.SetBool("isAttacking", false);
 
-        agent.enabled = false;
+        if (agent != null)
+        {
+            agent.enabled = false;
+        }
 
         animator.SetTrigger("die");
 
