@@ -8,29 +8,29 @@ public class ZombieSpawner : MonoBehaviour
 
     [Header("Zombie Prefab & Loot")]
     public GameObject zombiePrefab;
-    public GameObject crystalPrefab;        // Masukkan prefab Kristal Score/EXP Anda di sini
+    public GameObject crystalPrefab;        
 
     [Header("Wave Settings")]
     public int currentWave = 1;
-    public int zombiesToSpawn = 10;
+    public int zombiesToSpawn = 5;          
     public int maxZombiesAlive = 3;
     public float spawnRate = 2f;
-    public float waveBreakDuration = 30f;  // Jeda waktu antar wave (30 detik)
+    public float waveBreakDuration = 30f;  
 
     [Header("Spawn Area")]
     public float spawnRadius = 5f;
 
     [Header("UI Canvas Settings")]
-    public TextMeshProUGUI waveUIText;      // UI teks status Wave (misal di tengah)
-    public TextMeshProUGUI zombieLeftText;  // UI teks sisa zombie yang hidup
-    public TextMeshProUGUI scoreUIText;     // UI teks skor dengan label EXP
-    public GameObject upgradePanelObject;   // UI Panel pop-up pilihan upgrade skill
+    public TextMeshProUGUI waveUIText;      
+    public TextMeshProUGUI zombieLeftText;  
+    public TextMeshProUGUI scoreUIText;     
+    public GameObject upgradePanelObject;   
 
     private int zombiesSpawned;
     private int zombiesKilled;
     
-    private int totalScore = 0;             // Menyimpan total skor/EXP player
-    private bool isWaveActive = false;      // Status penanda apakah wave sedang berjalan atau dalam waktu istirahat
+    private int totalScore = 0;             
+    private bool isWaveActive = false;      
 
     void Awake()
     {
@@ -39,10 +39,38 @@ public class ZombieSpawner : MonoBehaviour
 
     void Start()
     {
-        if (upgradePanelObject != null) upgradePanelObject.SetActive(false); // Sembunyikan panel upgrade di awal
+        if (upgradePanelObject != null) upgradePanelObject.SetActive(false); 
         UpdateScoreUI();
+        UpdateWaveUI(); 
         
-        // PENGAMAN 1: Langsung isi UI teks sisa zombie dengan angka target awal saat game di-start
+        // Ambil data status menu (1 = Continue, 0 = New Game)
+        int isContinuing = PlayerPrefs.GetInt("IsContinuingGame", 0);
+
+        if (isContinuing == 1)
+        {
+            // Jika Continue, load progress wave, exp, senjata, DAN darah
+            LoadGameProgress(); 
+            PlayerPrefs.SetInt("IsContinuingGame", 0); 
+            PlayerPrefs.Save();
+        }
+        else
+        {
+            // Jika New Game, setel semua ke kondisi awal dasar pabrik
+            currentWave = 1;
+            zombiesToSpawn = 5;
+            
+            // Setel darah player ke penuh (100) karena ini game baru
+            GameObject player = GameObject.FindGameObjectWithTag("Player");
+            if (player != null)
+            {
+                PlayerHealth pHealth = player.GetComponent<PlayerHealth>();
+                if (pHealth != null)
+                {
+                    pHealth.SetHealthFromSpawner(pHealth.maxHealth);
+                }
+            }
+        }
+
         if (zombieLeftText != null)
         {
             zombieLeftText.text = $"Zombies: {zombiesToSpawn}";
@@ -51,7 +79,6 @@ public class ZombieSpawner : MonoBehaviour
         StartCoroutine(GameStartCountdown());
     }
 
-    // Jeda countdown 5 detik saat pertama kali game di-start agar player bisa bersiap
     private IEnumerator GameStartCountdown()
     {
         isWaveActive = false;
@@ -70,33 +97,26 @@ public class ZombieSpawner : MonoBehaviour
         zombiesKilled = 0;
         isWaveActive = true;
 
-        // PENGAMAN 2: Memaksa angka minimal jika terjadi kesalahan pembacaan variabel di frame pertama
         if (currentWave == 1 && zombiesToSpawn <= 0)
         {
-            zombiesToSpawn = 10; 
+            zombiesToSpawn = 5; 
         }
 
-        // Tampilkan LOG & UI saat wave dimulai
         Debug.Log($"DeadWave Log: WAVE {currentWave} DIMULAI! Target: {zombiesToSpawn} Zombie.");
-        if (waveUIText != null) waveUIText.text = $"WAVE {currentWave}";
         
+        UpdateWaveUI(); 
         UpdateZombieLeftUI();
-        Invoke(nameof(ClearWaveText), 3f);
 
-        // Jalankan coroutine pembuat zombie
         StartCoroutine(SpawnZombieRoutine());
     }
 
-    // Coroutine khusus untuk mengatur jeda kelahiran zombie secara berkala
     private IEnumerator SpawnZombieRoutine()
     {
         while (isWaveActive && zombiesSpawned < zombiesToSpawn)
         {
-            // Ambil data jumlah zombie yang aktif saat ini di map
             GameObject[] activeZombies = GameObject.FindGameObjectsWithTag("Zombie");
             UpdateZombieLeftUI();
 
-            // Hanya spawn jika zombie di map belum menyentuh batas maksimal
             if (activeZombies.Length < maxZombiesAlive)
             {
                 SpawnZombie();
@@ -104,7 +124,6 @@ public class ZombieSpawner : MonoBehaviour
                 UpdateZombieLeftUI();
             }
 
-            // Beri jeda antar spawn sesuai spawnRate (2 detik)
             yield return new WaitForSeconds(spawnRate);
         }
     }
@@ -113,26 +132,18 @@ public class ZombieSpawner : MonoBehaviour
     {
         if (!isWaveActive) return;
 
-        // Cek secara real-time apakah semua zombie sudah mati
         GameObject[] activeZombies = GameObject.FindGameObjectsWithTag("Zombie");
-        
-        // Logika hitungan kill
         zombiesKilled = zombiesToSpawn - activeZombies.Length;
         
-        // Jaga agar teks UI sisa zombie selalu ter-update jika ada perubahan jumlah di map
         if (zombieLeftText != null)
         {
             int remainingInWave = Mathf.Max(0, zombiesToSpawn - zombiesSpawned + activeZombies.Length);
             zombieLeftText.text = $"Zombies: {remainingInWave}";
         }
 
-        // PENGAMAN 3: Wave HANYA boleh selesai jika:
-        // 1. Jumlah zombie yang lahir sudah mencapai target (zombiesSpawned >= zombiesToSpawn)
-        // 2. DAN jumlah zombie yang tersisa hidup di map benar-benar sudah 0 (activeZombies.Length == 0)
-        // 3. DAN target zombie-nya bukan angka 0 (zombiesToSpawn > 0)
         if (zombiesSpawned >= zombiesToSpawn && activeZombies.Length == 0 && zombiesToSpawn > 0)
         {
-            isWaveActive = false; // Matikan status wave aktif
+            isWaveActive = false; 
             StartCoroutine(WaveClearRoutine());
         }
     }
@@ -158,19 +169,24 @@ public class ZombieSpawner : MonoBehaviour
 
     private IEnumerator WaveClearRoutine()
     {
-        // Tampilkan LOG & UI saat wave selesai
         Debug.Log($"DeadWave Log: WAVE {currentWave} SELESAI!");
         if (waveUIText != null) waveUIText.text = "WAVE CLEAR!";
-        yield return new WaitForSeconds(2f);
-        if (waveUIText != null) waveUIText.text = "";
+        
+        // AUTOSAVE: Menyimpan seluruh state awal wave saat ini
+        SaveGameProgress(); 
 
-        // Tampilkan Panel Pilihan Upgrade & Freeze Game sementara agar player bisa memilih stat
+        yield return new WaitForSeconds(2f);
+
         if (upgradePanelObject != null)
         {
             upgradePanelObject.SetActive(true);
             Time.timeScale = 0f; 
             Cursor.lockState = CursorLockMode.None; 
             Cursor.visible = true; 
+        }
+        else
+        {
+            StartCoroutine(WaveBreakCountdownRoutine());
         }
     }
 
@@ -183,7 +199,6 @@ public class ZombieSpawner : MonoBehaviour
             if (wManager != null)
             {
                 wManager.fireDamage += 5;
-                Debug.Log($"DeadWave Log: Damage Senjata Naik! Total: {wManager.fireDamage}");
             }
         }
         ResumeGameAfterUpgrade();
@@ -198,7 +213,6 @@ public class ZombieSpawner : MonoBehaviour
             if (wManager != null)
             {
                 wManager.fireRate = Mathf.Max(0.08f, wManager.fireRate - 0.02f);
-                Debug.Log($"DeadWave Log: Tembakan Makin Cepat! Jeda: {wManager.fireRate}");
             }
         }
         ResumeGameAfterUpgrade();
@@ -208,35 +222,122 @@ public class ZombieSpawner : MonoBehaviour
     {
         if (upgradePanelObject) upgradePanelObject.SetActive(false);
 
-        Time.timeScale = 1f; // Jalankan kembali game
+        Time.timeScale = 1f; 
         Cursor.lockState = CursorLockMode.Locked; 
         Cursor.visible = false;
 
-        // Jalankan jeda istirahat 30 detik menuju wave berikutnya
         StartCoroutine(WaveBreakCountdownRoutine());
     }
 
-    // Coroutine hitung mundur istirahat selama 30 detik untuk bersiap-siap
     private IEnumerator WaveBreakCountdownRoutine()
     {
         currentWave++;
-        zombiesToSpawn += 5; // Tambah 5 target zombie untuk wave berikutnya
+        zombiesToSpawn += 5; 
 
         for (int i = (int)waveBreakDuration; i > 0; i--)
         {
-            if (waveUIText != null) waveUIText.text = $"Wave {currentWave} Muncul Dalam: {i}";
+            if (waveUIText != null) waveUIText.text = $"NEXT WAVE IN: {i}s";
             yield return new WaitForSeconds(1f);
         }
 
-        // Mulai wave baru setelah 30 detik selesai
         StartNewWave();
     }
 
-    void NextWave() { } // Fungsi lama dinonaktifkan karena alurnya sudah digantikan oleh Coroutine
+    // ===================================================
+    //            SYSTEM UTAMA SAVE DAN LOAD
+    // ===================================================
 
-    private void ClearWaveText()
+    public void SaveGameProgress()
     {
-        if (waveUIText != null) waveUIText.text = "";
+        PlayerPrefs.SetInt("SavedWave", currentWave);
+        PlayerPrefs.SetInt("SavedScore", totalScore);
+
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        if (player != null)
+        {
+            // 1. Simpan Semua Data Senjata & Ammo
+            PlayerWeaponCameraManager wManager = player.GetComponent<PlayerWeaponCameraManager>();
+            if (wManager != null)
+            {
+                PlayerPrefs.SetInt("HasMelee", wManager.hasMelee ? 1 : 0);
+                PlayerPrefs.SetInt("HasFirearm", wManager.hasFirearm ? 1 : 0);
+                PlayerPrefs.SetInt("ActiveWeaponIndex", (int)wManager.activeWeapon);
+                PlayerPrefs.SetInt("AmmoInMag", wManager.ammoInMag);
+                PlayerPrefs.SetInt("CarriableAmmo", wManager.carriableAmmo);
+                PlayerPrefs.SetInt("SavedWeaponDamage", wManager.fireDamage);
+                PlayerPrefs.SetFloat("SavedWeaponFireRate", wManager.fireRate);
+            }
+
+            // 2. Simpan Data Darah Player Aktif
+            PlayerHealth pHealth = player.GetComponent<PlayerHealth>();
+            if (pHealth != null)
+            {
+                PlayerPrefs.SetInt("SavedPlayerHealth", pHealth.currentHealth);
+            }
+        }
+
+        PlayerPrefs.Save();
+        Debug.Log("DeadWave Log: Data Awal Wave Berhasil Disimpan!");
+    }
+
+    public void LoadGameProgress()
+    {
+        if (PlayerPrefs.HasKey("SavedWave"))
+        {
+            currentWave = PlayerPrefs.GetInt("SavedWave", 1);
+            totalScore = PlayerPrefs.GetInt("SavedScore", 0);
+            zombiesToSpawn = 5 + ((currentWave - 1) * 5); 
+
+            GameObject player = GameObject.FindGameObjectWithTag("Player");
+            if (player != null)
+            {
+                // 1. Muat Ulang Persenjataan & Amunisi
+                PlayerWeaponCameraManager wManager = player.GetComponent<PlayerWeaponCameraManager>();
+                if (wManager != null)
+                {
+                    wManager.hasMelee = PlayerPrefs.GetInt("HasMelee", 0) == 1;
+                    wManager.hasFirearm = PlayerPrefs.GetInt("HasFirearm", 0) == 1;
+                    wManager.ammoInMag = PlayerPrefs.GetInt("AmmoInMag", 30);
+                    wManager.carriableAmmo = PlayerPrefs.GetInt("CarriableAmmo", 60);
+                    wManager.fireDamage = PlayerPrefs.GetInt("SavedWeaponDamage", wManager.fireDamage);
+                    wManager.fireRate = PlayerPrefs.GetFloat("SavedWeaponFireRate", wManager.fireRate);
+                    
+                    int weaponIndex = PlayerPrefs.GetInt("ActiveWeaponIndex", 0);
+                    wManager.activeWeapon = (DeadWaveWeapon)weaponIndex;
+                    wManager.OnItemEquip(); 
+                }
+
+                // 2. Muat Ulang Darah Player Berdasarkan Save Data
+                PlayerHealth pHealth = player.GetComponent<PlayerHealth>();
+                if (pHealth != null)
+                {
+                    int savedHP = PlayerPrefs.GetInt("SavedPlayerHealth", pHealth.maxHealth);
+                    pHealth.SetHealthFromSpawner(savedHP);
+                }
+            }
+
+            UpdateScoreUI();
+            UpdateWaveUI();
+        }
+    }
+
+    [ContextMenu("Hapus Save Data")]
+    public void DeleteSaveData()
+    {
+        PlayerPrefs.DeleteAll();
+        Debug.Log("DeadWave Log: Semua data save game dihapus!");
+    }
+
+    // ===================================================
+    //                    UPDATE UI
+    // ===================================================
+
+    private void UpdateWaveUI()
+    {
+        if (waveUIText != null)
+        {
+            waveUIText.text = $"WAVE: {currentWave}";
+        }
     }
 
     public void AddScore(int amount)

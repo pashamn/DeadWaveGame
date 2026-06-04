@@ -6,7 +6,8 @@ public class PlayerHealth : MonoBehaviour
     [Header("Health")]
     public int maxHealth = 100;
 
-    private int currentHealth;
+    // Diubah menjadi properti public agar bisa dibaca oleh ZombieSpawner saat Save
+    public int currentHealth { get; private set; }
 
     public bool IsDead { get; private set; }
 
@@ -15,14 +16,13 @@ public class PlayerHealth : MonoBehaviour
 
     void Start()
     {
-        currentHealth = maxHealth;
-
-        UpdateHealthBar();
+        // Fungsi Start dikosongkan dari pengaturan darah default.
+        // Sekarang, ZombieSpawner yang akan bertanggung jawab menyetel darah di awal game.
     }
 
     void Update()
     {
-        // TEST DAMAGE
+        // TEST DAMAGE (Tombol Space)
         if (Input.GetKeyDown(KeyCode.Space))
         {
             TakeDamage(10);
@@ -35,7 +35,6 @@ public class PlayerHealth : MonoBehaviour
             return;
 
         currentHealth -= damage;
-
         currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
 
         UpdateHealthBar();
@@ -48,16 +47,31 @@ public class PlayerHealth : MonoBehaviour
         }
     }
 
-    void UpdateHealthBar()
+    // Fungsi khusus yang dipanggil oleh ZombieSpawner saat game dimulai / di-load
+    public void SetHealthFromSpawner(int amount)
     {
-        healthFill.fillAmount =
-            (float)currentHealth / maxHealth;
+        currentHealth = amount;
+        currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
+        
+        if (currentHealth > 0)
+        {
+            IsDead = false;
+        }
+
+        UpdateHealthBar();
+    }
+
+    public void UpdateHealthBar()
+    {
+        if (healthFill != null)
+        {
+            healthFill.fillAmount = (float)currentHealth / maxHealth;
+        }
     }
 
     void Die()
     {
         IsDead = true;
-
         Debug.Log("PLAYER DEAD");
     }
 }
