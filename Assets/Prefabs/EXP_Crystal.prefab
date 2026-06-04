@@ -256,3 +256,5 @@ MonoBehaviour:
   scoreValue: 100
   magnetRadius: 5
   flySpeed: 8
+  minAmmoToGrant: 10
+  maxAmmoToGrant: 20

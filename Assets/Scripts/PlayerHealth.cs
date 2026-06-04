@@ -22,8 +22,9 @@ public class PlayerHealth : MonoBehaviour
 
     void Update()
     {
-        // TEST DAMAGE (Tombol Space)
-        if (Input.GetKeyDown(KeyCode.Space))
+        // PERBAIKAN: Tombol tes damage dipindahkan dari SPACE ke tombol K 
+        // agar tidak bentrok dengan tombol Lompat (Jump) bawaan Invector.
+        if (Input.GetKeyDown(KeyCode.K))
         {
             TakeDamage(10);
         }

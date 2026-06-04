@@ -23,9 +23,9 @@ public class PlayerWeaponCameraManager : MonoBehaviour
     public GameObject bulletPrefab;        
     public float bulletSpeed = 80f;        
 
-    [Header("Sistem Peluru & UI (BARU)")]
+    [Header("Sistem Peluru & UI")]
     public TextMeshProUGUI ammoUIText;     // Tarik objek AmmoText (TMP) ke slot ini
-    public int magCapacity = 30;           // Kapasitas maksimal magasin AK74
+    public int magCapacity = 30;           // Kapasitas maksimal magasin AK74 (Dinamis)
     public int ammoInMag = 30;             // Peluru di dalam senjata saat ini
     public int carriableAmmo = 60;         // Peluru cadangan di dalam tas
     public int maxCarriableAmmo = 180;     // Batas maksimal peluru cadangan di tas
@@ -56,10 +56,29 @@ public class PlayerWeaponCameraManager : MonoBehaviour
     [Header("WeaponSwitch Settings")]
     public float switchDuration = 0.5f; 
 
+    [Header("DeadWave Audio Clips")]
+    [Tooltip("Masukkan 2 atau lebih variasi suara langkah kaki di sini")]
+    public AudioClip[] walkSounds;       // Array variasi langkah kaki
+    public AudioClip punchSound;         // Efek suara hantaman tinju
+    public AudioClip meleeSound;         // Efek suara hantaman/ayunan linggis keras
+    public AudioClip firearmSound;       // Letusan suara tembakan AK74
+    
+    [Header("DeadWave Volume Controllers")]
+    [Range(0f, 1f)] public float walkVolume = 0.25f;    // Bawaan 25% (Lembut)
+    [Range(0f, 1f)] public float runVolume = 0.45f;     // Bawaan 45% (Sedang)
+    [Range(0f, 1f)] public float punchVolume = 0.5f;    // Bawaan 50%
+    [Range(0f, 1f)] public float meleeVolume = 0.6f;    // Bawaan 60%
+    [Range(0f, 1f)] public float firearmVolume = 0.55f; // Bawaan 55%
+
+    [Header("Footstep Timers")]
+    [Range(0.1f, 1f)] public float footstepIntervalWalk = 0.5f; // Ritme jeda jalan
+    [Range(0.1f, 1f)] public float footstepIntervalRun = 0.28f; // Ritme jeda lari
+
     [Header("Invector & Unity References")]
     private vThirdPersonController controller;
     private vThirdPersonCamera      vCam;
     private Animator                animator;
+    private AudioSource             audioSource; 
 
     [System.Serializable]
     public struct CameraValues
@@ -76,18 +95,20 @@ public class PlayerWeaponCameraManager : MonoBehaviour
 
     private float nextFireTime = 0f;
     private bool  isSwitching  = false;
+    private float footstepTimer = 0f;
 
     private void Awake()
     {
-        controller = GetComponent<vThirdPersonController>();
-        animator   = GetComponent<Animator>();
-        vCam       = FindFirstObjectByType<vThirdPersonCamera>();
+        controller  = GetComponent<vThirdPersonController>();
+        animator    = GetComponent<Animator>();
+        vCam        = FindFirstObjectByType<vThirdPersonCamera>();
+        audioSource = GetComponent<AudioSource>(); 
     }
 
     private void Start()
     {
         ApplyWeaponLayerState();
-        UpdateAmmoUI(); // Perbarui tampilan UI saat game dimulai
+        UpdateAmmoUI(); 
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
@@ -106,6 +127,8 @@ public class PlayerWeaponCameraManager : MonoBehaviour
             Cursor.visible = false;
         }
 
+        HandleFootstepAudio();
+
         if (isSwitching || isPickingUp || isReloading) return; 
 
         HandleWeaponSwitchInput();
@@ -122,6 +145,59 @@ public class PlayerWeaponCameraManager : MonoBehaviour
             {
                 transform.rotation = Quaternion.LookRotation(cameraForward);
             }
+        }
+    }
+
+    private void HandleFootstepAudio()
+    {
+        if (controller == null || audioSource == null || walkSounds == null || walkSounds.Length == 0) return;
+
+        if (controller.input.magnitude > 0.1f && controller.isGrounded)
+        {
+            footstepTimer += Time.deltaTime;
+
+            if (controller.isSprinting)
+            {
+                if (footstepTimer >= footstepIntervalRun)
+                {
+                    audioSource.pitch = Random.Range(1.1f, 1.2f); 
+                    PlayRandomFootstep(runVolume); 
+                    footstepTimer = 0f;
+                }
+            }
+            else
+            {
+                if (footstepTimer >= footstepIntervalWalk)
+                {
+                    audioSource.pitch = Random.Range(0.95f, 1.05f);
+                    PlayRandomFootstep(walkVolume); 
+                    footstepTimer = 0f;
+                }
+            }
+        }
+        else
+        {
+            footstepTimer = 0f;
+        }
+    }
+
+    private void PlayRandomFootstep(float volume)
+    {
+        int randomIndex = Random.Range(0, walkSounds.Length);
+        AudioClip selectedClip = walkSounds[randomIndex];
+        
+        if (selectedClip != null)
+        {
+            audioSource.PlayOneShot(selectedClip, volume);
+        }
+    }
+
+    private void PlaySFX(AudioClip clip, float volume = 1f)
+    {
+        if (clip != null && audioSource != null)
+        {
+            audioSource.pitch = 1f; 
+            audioSource.PlayOneShot(clip, volume);
         }
     }
 
@@ -174,7 +250,7 @@ public class PlayerWeaponCameraManager : MonoBehaviour
         }
         
         ApplyWeaponLayerState();
-        UpdateAmmoUI(); // Update UI setelah ganti senjata
+        UpdateAmmoUI(); 
     }
 
     public void ChangeWeaponState(DeadWaveWeapon newWeapon)
@@ -245,7 +321,8 @@ public class PlayerWeaponCameraManager : MonoBehaviour
 
         yield return new WaitForSeconds(1.2f); 
 
-        int ammoNeeded = magCapacity - ammoInMag;
+        // PERBAIKAN UTAMA: Perhitungan reload sekarang dinamis mengikuti variabel magCapacity hasil upgrade!
+        int ammoNeeded = magCapacity - ammoInMag; 
         int ammoToTransfer = Mathf.Min(ammoNeeded, carriableAmmo);
 
         ammoInMag += ammoToTransfer;
@@ -253,7 +330,7 @@ public class PlayerWeaponCameraManager : MonoBehaviour
 
         isReloading = false;
         UpdateAmmoUI(); 
-        Debug.Log($"DeadWave Log: Reload Selesai!");
+        Debug.Log($"DeadWave Log: Reload Selesai dengan Kapasitas Baru!");
     }
 
     private void TryAttack()
@@ -282,6 +359,9 @@ public class PlayerWeaponCameraManager : MonoBehaviour
         animator.SetInteger("PunchID", lastPunchID);
         animator.ResetTrigger("Punch");
         animator.SetTrigger("Punch");
+
+        PlaySFX(punchSound, punchVolume); 
+
         CheckMeleeHit(punchDamage, punchRange);
     }
 
@@ -291,6 +371,9 @@ public class PlayerWeaponCameraManager : MonoBehaviour
         nextFireTime = Time.time + meleeCooldown;
         animator.ResetTrigger("MeleeAttack");
         animator.SetTrigger("MeleeAttack");
+
+        PlaySFX(meleeSound, meleeVolume); 
+
         StartCoroutine(DelayedMeleeHitCheck(0.15f, meleeDamage, meleeRange));
     }
 
@@ -314,6 +397,8 @@ public class PlayerWeaponCameraManager : MonoBehaviour
         ammoInMag--;
         nextFireTime = Time.time + fireRate;
         UpdateAmmoUI(); 
+
+        PlaySFX(firearmSound, firearmVolume); 
 
         if (muzzleFlashPrefab != null && firePoint != null)
         {
@@ -391,6 +476,17 @@ public class PlayerWeaponCameraManager : MonoBehaviour
         vCam.defaultDistance = Mathf.Lerp(vCam.defaultDistance, target.distance,    t);
         vCam.height          = Mathf.Lerp(vCam.height,          target.height,      t);
         vCam.rightOffset     = Mathf.Lerp(vCam.rightOffset,     target.rightOffset, t);
+
+        if (activeWeapon == DeadWaveWeapon.Firearm)
+        {
+            vCam.xMouseSensitivity = 1.5f; 
+            vCam.yMouseSensitivity = 1.5f;
+        }
+        else
+        {
+            vCam.xMouseSensitivity = 3.5f; 
+            vCam.yMouseSensitivity = 3.5f;
+        }
     }
 
     public void UpdateAmmoUI()
@@ -414,13 +510,9 @@ public class PlayerWeaponCameraManager : MonoBehaviour
         Debug.Log($"DeadWave Log: Peluru Cadangan Ditambahkan! Total: {carriableAmmo}");
     }
 
-    // ==========================================
-    // FUNGSI BARU: DIHUBUNGKAN KE ZOMBIE SPAWNER
-    // ==========================================
+    // PERBAIKAN: Fungsi ini diaktifkan agar saat panel ditutup, UI teks amunisi langsung dipaksa refresh
     public void UpgradeWeaponStats(int waveSelesai)
     {
-        // Fungsi ini sengaja dikosongkan karena nilai variabel 'fireDamage' dan 'fireRate' 
-        // sekarang langsung disuntikkan secara dinamis oleh tombol UI via ZombieSpawner.cs
         UpdateAmmoUI();
     }
 
