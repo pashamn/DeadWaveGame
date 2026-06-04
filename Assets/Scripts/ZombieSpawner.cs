@@ -1,10 +1,10 @@
 using UnityEngine;
 using System.Collections;
-using TMPro; // WAJIB: Untuk mengatur UI TextMeshPro
+using TMPro;
 
 public class ZombieSpawner : MonoBehaviour
 {
-    public static ZombieSpawner Instance; // Singleton agar gampang dipanggil dari script zombie
+    public static ZombieSpawner Instance;
 
     [Header("Zombie Prefab & Loot")]
     public GameObject zombiePrefab;
@@ -20,8 +20,9 @@ public class ZombieSpawner : MonoBehaviour
     [Header("Spawn Area")]
     public float spawnRadius = 5f;
 
-    [Header("UI Canvas Settings")]
-    public TextMeshProUGUI waveUIText;      
+    [Header("UI Canvas Settings (DIPISAH)")]
+    public TextMeshProUGUI waveUIText;       // Khusus untuk Teks di dalam banner atas ("WAVE: 1")
+    public TextMeshProUGUI countdownUIText;  // BARU: Khusus untuk angka hitung mundur di tengah layar
     public TextMeshProUGUI zombieLeftText;  
     public TextMeshProUGUI scoreUIText;     
     public GameObject upgradePanelObject;   
@@ -41,25 +42,21 @@ public class ZombieSpawner : MonoBehaviour
     {
         if (upgradePanelObject != null) upgradePanelObject.SetActive(false); 
         UpdateScoreUI();
-        UpdateWaveUI(); 
+        UpdateWaveUI(); // Langsung set teks banner atas sejak game dimulai
         
-        // Ambil data status menu (1 = Continue, 0 = New Game)
         int isContinuing = PlayerPrefs.GetInt("IsContinuingGame", 0);
 
         if (isContinuing == 1)
         {
-            // Jika Continue, load progress wave, exp, senjata, DAN darah
             LoadGameProgress(); 
             PlayerPrefs.SetInt("IsContinuingGame", 0); 
             PlayerPrefs.Save();
         }
         else
         {
-            // Jika New Game, setel semua ke kondisi awal dasar pabrik
             currentWave = 1;
             zombiesToSpawn = 5;
             
-            // Setel darah player ke penuh (100) karena ini game baru
             GameObject player = GameObject.FindGameObjectWithTag("Player");
             if (player != null)
             {
@@ -82,11 +79,16 @@ public class ZombieSpawner : MonoBehaviour
     private IEnumerator GameStartCountdown()
     {
         isWaveActive = false;
+        
+        // Hitung mundur awal menggunakan countdownUIText (Tengah Layar)
         for (int i = 5; i > 0; i--)
         {
-            if (waveUIText != null) waveUIText.text = $"Mulai dalam: {i}";
+            if (countdownUIText != null) countdownUIText.text = $"Mulai dalam: {i}";
             yield return new WaitForSeconds(1f);
         }
+        
+        // Bersihkan teks tengah saat wave dimulai
+        if (countdownUIText != null) countdownUIText.text = "";
         
         StartNewWave();
     }
@@ -104,7 +106,7 @@ public class ZombieSpawner : MonoBehaviour
 
         Debug.Log($"DeadWave Log: WAVE {currentWave} DIMULAI! Target: {zombiesToSpawn} Zombie.");
         
-        UpdateWaveUI(); 
+        UpdateWaveUI(); // Perbarui teks di dalam banner atas
         UpdateZombieLeftUI();
 
         StartCoroutine(SpawnZombieRoutine());
@@ -170,12 +172,14 @@ public class ZombieSpawner : MonoBehaviour
     private IEnumerator WaveClearRoutine()
     {
         Debug.Log($"DeadWave Log: WAVE {currentWave} SELESAI!");
-        if (waveUIText != null) waveUIText.text = "WAVE CLEAR!";
         
-        // AUTOSAVE: Menyimpan seluruh state awal wave saat ini
+        // Tampilkan status clear di teks tengah agar banner atas tetap konstan
+        if (countdownUIText != null) countdownUIText.text = "WAVE CLEAR!";
+        
         SaveGameProgress(); 
 
         yield return new WaitForSeconds(2f);
+        if (countdownUIText != null) countdownUIText.text = "";
 
         if (upgradePanelObject != null)
         {
@@ -234,18 +238,16 @@ public class ZombieSpawner : MonoBehaviour
         currentWave++;
         zombiesToSpawn += 5; 
 
+        // Hitung mundur istirahat menggunakan teks tengah (countdownUIText)
         for (int i = (int)waveBreakDuration; i > 0; i--)
         {
-            if (waveUIText != null) waveUIText.text = $"NEXT WAVE IN: {i}s";
+            if (countdownUIText != null) countdownUIText.text = $"NEXT WAVE IN: {i}s";
             yield return new WaitForSeconds(1f);
         }
 
+        if (countdownUIText != null) countdownUIText.text = "";
         StartNewWave();
     }
-
-    // ===================================================
-    //            SYSTEM UTAMA SAVE DAN LOAD
-    // ===================================================
 
     public void SaveGameProgress()
     {
@@ -255,7 +257,6 @@ public class ZombieSpawner : MonoBehaviour
         GameObject player = GameObject.FindGameObjectWithTag("Player");
         if (player != null)
         {
-            // 1. Simpan Semua Data Senjata & Ammo
             PlayerWeaponCameraManager wManager = player.GetComponent<PlayerWeaponCameraManager>();
             if (wManager != null)
             {
@@ -268,7 +269,6 @@ public class ZombieSpawner : MonoBehaviour
                 PlayerPrefs.SetFloat("SavedWeaponFireRate", wManager.fireRate);
             }
 
-            // 2. Simpan Data Darah Player Aktif
             PlayerHealth pHealth = player.GetComponent<PlayerHealth>();
             if (pHealth != null)
             {
@@ -291,7 +291,6 @@ public class ZombieSpawner : MonoBehaviour
             GameObject player = GameObject.FindGameObjectWithTag("Player");
             if (player != null)
             {
-                // 1. Muat Ulang Persenjataan & Amunisi
                 PlayerWeaponCameraManager wManager = player.GetComponent<PlayerWeaponCameraManager>();
                 if (wManager != null)
                 {
@@ -307,7 +306,6 @@ public class ZombieSpawner : MonoBehaviour
                     wManager.OnItemEquip(); 
                 }
 
-                // 2. Muat Ulang Darah Player Berdasarkan Save Data
                 PlayerHealth pHealth = player.GetComponent<PlayerHealth>();
                 if (pHealth != null)
                 {
@@ -321,22 +319,18 @@ public class ZombieSpawner : MonoBehaviour
         }
     }
 
-    [ContextMenu("Hapus Save Data")]
     public void DeleteSaveData()
     {
         PlayerPrefs.DeleteAll();
         Debug.Log("DeadWave Log: Semua data save game dihapus!");
     }
 
-    // ===================================================
-    //                    UPDATE UI
-    // ===================================================
-
     private void UpdateWaveUI()
     {
         if (waveUIText != null)
         {
-            waveUIText.text = $"WAVE: {currentWave}";
+            // Format disesuaikan agar pas masuk ke dalam UI banner atas Anda
+            waveUIText.text = $"Wave {currentWave}";
         }
     }
 
