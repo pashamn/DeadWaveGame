@@ -12,6 +12,8 @@ public class ZombieAI : MonoBehaviour
 
     [Header("Zombie Settings")]
     public float chaseDistance = 15f;
+    [Tooltip("Jarak maksimal player kabur sebelum zombie menyerah dan kembali patroli")]
+    public float loseChaseDistance = 22f; // Jarak menyerah (Harus lebih besar dari chaseDistance)
     public float attackDistance = 2f;
     public float attackCooldown = 1.5f;
     public int damage = 10;
@@ -38,14 +40,9 @@ public class ZombieAI : MonoBehaviour
     private AudioClip currentClip;
 
     [Header("Volume Settings")]
-    [Range(0f, 1f)]
-    public float idleVolume = 0.2f;
-
-    [Range(0f, 1f)]
-    public float chaseVolume = 0.7f;
-
-    [Range(0f, 1f)]
-    public float attackVolume = 1f;
+    [Range(0f, 1f)] public float idleVolume = 0.2f;
+    [Range(0f, 1f)] public float chaseVolume = 0.7f;
+    [Range(0f, 1f)] public float attackVolume = 1f;
 
     [Header("3D Audio")]
     public float minAudioDistance = 3f;
@@ -82,8 +79,7 @@ public class ZombieAI : MonoBehaviour
             audioSource.rolloffMode = AudioRolloffMode.Logarithmic;
         }
 
-        GameObject playerObj =
-            GameObject.FindGameObjectWithTag("Player");
+        GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
 
         if (playerObj != null)
         {
@@ -98,14 +94,12 @@ public class ZombieAI : MonoBehaviour
         if (health.IsDead || player == null)
             return;
 
-        float distanceSqr =
-            (player.position - transform.position).sqrMagnitude;
+        // Kalkulasi jarak kuadrat (lebih ringan performanya dibanding Vector3.Distance biasa)
+        float distanceSqr = (player.position - transform.position).sqrMagnitude;
 
-        float chaseDistanceSqr =
-            chaseDistance * chaseDistance;
-
-        float attackDistanceSqr =
-            attackDistance * attackDistance;
+        float chaseDistanceSqr = chaseDistance * chaseDistance;
+        float loseChaseDistanceSqr = loseChaseDistance * loseChaseDistance; // Batas menyerah kuadrat
+        float attackDistanceSqr = attackDistance * attackDistance;
 
         switch (currentState)
         {
@@ -120,21 +114,15 @@ public class ZombieAI : MonoBehaviour
                 {
                     nextRoamTime = Time.time + roamTimer;
 
-                    Vector3 randomPosition =
-                        transform.position +
-                        new Vector3(
-                            Random.Range(-roamRadius, roamRadius),
-                            0,
-                            Random.Range(-roamRadius, roamRadius)
-                        );
+                    Vector3 randomPosition = transform.position + new Vector3(
+                        Random.Range(-roamRadius, roamRadius),
+                        0,
+                        Random.Range(-roamRadius, roamRadius)
+                    );
 
                     NavMeshHit hit;
 
-                    if (NavMesh.SamplePosition(
-                        randomPosition,
-                        out hit,
-                        roamRadius,
-                        NavMesh.AllAreas))
+                    if (NavMesh.SamplePosition(randomPosition, out hit, roamRadius, NavMesh.AllAreas))
                     {
                         agent.SetDestination(hit.position);
                     }
@@ -154,11 +142,19 @@ public class ZombieAI : MonoBehaviour
                 animator.SetBool("isRunning", true);
                 animator.SetBool("isAttacking", false);
 
+                // PERBAIKAN UTAMA: Jika player lari menjauh melewati batas loseChaseDistance, zombie menyerah!
+                if (distanceSqr > loseChaseDistanceSqr)
+                {
+                    agent.ResetPath(); // Stop mengejar posisi player
+                    nextRoamTime = Time.time + 1f; // Beri jeda 1 detik sebelum mulai patroli biasa
+                    currentState = ZombieState.Idle; // Kembalikan status zombie ke Idle/Patroli biasa
+                    Debug.Log("DeadWave Log: Zombie kehilangan jejak player dan berhenti mengejar.");
+                    return;
+                }
+
                 if (Time.time >= nextUpdateTime)
                 {
-                    nextUpdateTime =
-                        Time.time + updateRate;
-
+                    nextUpdateTime = Time.time + updateRate;
                     agent.SetDestination(player.position);
                 }
 
@@ -218,7 +214,6 @@ public class ZombieAI : MonoBehaviour
         audioSource.loop = true;
         audioSource.volume = volume;
 
-        // Pitch random supaya tiap zombie tidak identik
         audioSource.pitch = Random.Range(0.9f, 1.1f);
 
         audioSource.Play();
@@ -226,22 +221,16 @@ public class ZombieAI : MonoBehaviour
 
     void Attack()
     {
-        nextAttackTime =
-            Time.time + attackCooldown;
+        nextAttackTime = Time.time + attackCooldown;
 
         Debug.Log("Zombie Attack");
 
-        if (audioSource != null &&
-            attackSound != null)
+        if (audioSource != null && attackSound != null)
         {
-            audioSource.PlayOneShot(
-                attackSound,
-                attackVolume
-            );
+            audioSource.PlayOneShot(attackSound, attackVolume);
         }
 
-        PlayerHealth playerHealth =
-            player.GetComponent<PlayerHealth>();
+        PlayerHealth playerHealth = player.GetComponent<PlayerHealth>();
 
         if (playerHealth != null)
         {

@@ -13,7 +13,7 @@ public class ZombieSpawner : MonoBehaviour
 
     [Header("Wave Settings")]
     public int currentWave = 1;
-    public int zombiesToSpawn = 5;          
+    public int zombiesToSpawn = 10; // Setel bawaan ke 10 sesuai rencana Wave 1 Anda
     public int maxZombiesAlive = 3;
     public float spawnRate = 2f;
     public float waveBreakDuration = 30f;  
@@ -29,11 +29,10 @@ public class ZombieSpawner : MonoBehaviour
     public GameObject upgradePanelObject;   // Panel UI Utama Upgrade
 
     [Header("UI Button Texts (Gacha Setup)")]
-    // Seret komponen TextMeshProUGUI dari Tombol 1, Tombol 2, dan Tombol 3 ke slot ini
     public TextMeshProUGUI buttonTextOption1;
     public TextMeshProUGUI buttonTextOption2;
     public TextMeshProUGUI buttonTextOption3;
-    public TextMeshProUGUI upgradeTitleUIText; // Teks Judul Panel (misal: "Pilih 1 Upgrade!")
+    public TextMeshProUGUI upgradeTitleUIText; 
 
     private int zombiesSpawned;
     private int zombiesKilled;
@@ -42,7 +41,10 @@ public class ZombieSpawner : MonoBehaviour
 
     // Sistem Aturan Jumlah Pilihan per Wave
     private int upgradePointsAvailable = 0; 
-    private List<int> currentRolledUpgrades = new List<int>(); // Menyimpan hasil kocokan 3 upgrade aktif
+    private List<int> currentRolledUpgrades = new List<int>(); 
+
+    // PERBAIKAN TUTORIAL: Variabel khusus melacak total kill di Wave 1
+    private int wave1KillCounter = 0; 
 
     void Awake()
     {
@@ -66,7 +68,7 @@ public class ZombieSpawner : MonoBehaviour
         else
         {
             currentWave = 1;
-            zombiesToSpawn = 5;
+            zombiesToSpawn = 10; // Mengunci target awal Wave 1 = 10 Zombie
             
             GameObject player = GameObject.FindGameObjectWithTag("Player");
             if (player != null)
@@ -107,7 +109,7 @@ public class ZombieSpawner : MonoBehaviour
 
         if (currentWave == 1 && zombiesToSpawn <= 0)
         {
-            zombiesToSpawn = 5; 
+            zombiesToSpawn = 10; 
         }
 
         Debug.Log($"DeadWave Log: WAVE {currentWave} DIMULAI! Target: {zombiesToSpawn} Zombie.");
@@ -140,7 +142,6 @@ public class ZombieSpawner : MonoBehaviour
         if (!isWaveActive) return;
 
         GameObject[] activeZombies = GameObject.FindGameObjectsWithTag("Zombie");
-        zombiesKilled = zombiesToSpawn - activeZombies.Length;
         
         if (zombieLeftText != null)
         {
@@ -166,6 +167,45 @@ public class ZombieSpawner : MonoBehaviour
         Instantiate(zombiePrefab, randomPosition, Quaternion.identity);
     }
 
+    // PERBAIKAN TUTORIAL: Dipanggil otomatis oleh ZombieHealth saat zombie mati
+    public void RegisterZombieDeath()
+    {
+        zombiesKilled++;
+
+        if (currentWave == 1)
+        {
+            wave1KillCounter++;
+
+            if (wave1KillCounter == 2)
+            {
+                // Memicu instruksi teks tengah dan menyalakan Garis GPS menuju Crowbar
+                if (countdownUIText != null) 
+                {
+                    countdownUIText.text = "ZOMBIE TUMBANG! IKUTI JALUR DI LANTAI UNTUK MENGAMBIL LINGGIS (TEKAN E)";
+                    Invoke(nameof(ClearCountdownText), 5f);
+                }
+                if (DeadWaveQuestTracker.Instance != null) DeadWaveQuestTracker.Instance.ActivationWeaponRoute(1);
+                Debug.Log("DeadWave Log: Pemicu jalur Melee aktif.");
+            }
+            else if (wave1KillCounter == 5) // 2 kill punch + 3 kill melee
+            {
+                // Memicu instruksi teks tengah dan menyalakan Garis GPS menuju AK74 Rifle
+                if (countdownUIText != null) 
+                {
+                    countdownUIText.text = "PERSENJATAAN BERAT! IKUTI JALUR LANTAI MENUJU RIFLE AK74 (TEKAN E)";
+                    Invoke(nameof(ClearCountdownText), 5f);
+                }
+                if (DeadWaveQuestTracker.Instance != null) DeadWaveQuestTracker.Instance.ActivationWeaponRoute(2);
+                Debug.Log("DeadWave Log: Pemicu jalur Rifle aktif.");
+            }
+        }
+    }
+
+    private void ClearCountdownText()
+    {
+        if (countdownUIText != null) countdownUIText.text = "";
+    }
+
     public void DropLootCrystal(Vector3 zombiePosition)
     {
         if (crystalPrefab != null)
@@ -183,12 +223,10 @@ public class ZombieSpawner : MonoBehaviour
         yield return new WaitForSeconds(2f);
         if (countdownUIText != null) countdownUIText.text = "";
 
-        // TENTUKAN POIN UPGRADE SESUAI ATURAN ANDA
-        if (currentWave == 1) upgradePointsAvailable = 1;      // Wave 1 beres -> Pilih 1
-        else if (currentWave == 2 || currentWave == 3) upgradePointsAvailable = 2; // Wave 2 & 3 -> Pilih 2
-        else upgradePointsAvailable = 2;                       // Wave selanjutnya otomatis dapat 2 poin
+        // Poin upgrade disesuaikan aturan Anda (Wave 1 = 1 poin, Wave 2 & 3 = 2 poin)
+        if (currentWave == 1) upgradePointsAvailable = 1;      
+        else upgradePointsAvailable = 2;                       
 
-        // Pemicu Kocokan Gacha 3 Pilihan Acak dari 7 Total Upgrade
         RollUpgradeOptions();
 
         if (upgradePanelObject != null)
@@ -205,33 +243,29 @@ public class ZombieSpawner : MonoBehaviour
         }
     }
 
-    // LOGIKA GACHA: Mengocok 3 angka unik dari jangkauan 0 sampai 6 (Total 7 Upgrade)
     private void RollUpgradeOptions()
     {
         currentRolledUpgrades.Clear();
-        List<int> pool = new List<int> { 0, 1, 2, 3, 4, 5, 6 }; // Kumpulan ID 7 tipe upgrade
+        List<int> pool = new List<int> { 0, 1, 2, 3, 4, 5, 6 }; 
 
-        // Ambil 3 angka secara acak tanpa kembar
         for (int i = 0; i < 3; i++)
         {
             int index = Random.Range(0, pool.Count);
             currentRolledUpgrades.Add(pool[index]);
-            pool.RemoveAt(index); // Hapus agar tidak keluar dua kali
+            pool.RemoveAt(index); 
         }
 
-        // Tampilkan teks nama upgrade hasil kocokan ke tombol UI Anda
         if (buttonTextOption1) buttonTextOption1.text = GetUpgradeNameByID(currentRolledUpgrades[0]);
         if (buttonTextOption2) buttonTextOption2.text = GetUpgradeNameByID(currentRolledUpgrades[1]);
         if (buttonTextOption3) buttonTextOption3.text = GetUpgradeNameByID(currentRolledUpgrades[2]);
     }
 
-    // Penerjemah ID angka menjadi teks nama tombol di Canvas
     private string GetUpgradeNameByID(int id)
     {
         return id switch
         {
             0 => "AK74 Damage (+5)",
-            1 => "Fire Rate (+10%)",
+            1 => "Fire Rate (+10%)", // Narasi UI disesuaikan jadi 10%
             2 => "Kapasitas Magasin (+10)",
             3 => "Spam Ayunan Melee (+15%)",
             4 => "Jangkauan Pukulan (+0.5m)",
@@ -241,14 +275,10 @@ public class ZombieSpawner : MonoBehaviour
         };
     }
 
-    // DIHUBUNGKAN KE TOMBOL 1
     public void ClickedOption1() { ExecuteUpgradeByID(currentRolledUpgrades[0]); }
-    // DIHUBUNGKAN KE TOMBOL 2
     public void ClickedOption2() { ExecuteUpgradeByID(currentRolledUpgrades[1]); }
-    // DIHUBUNGKAN KE TOMBOL 3
     public void ClickedOption3() { ExecuteUpgradeByID(currentRolledUpgrades[2]); }
 
-    // Eksekutor modifikasi variabel berdasarkan tombol pilihan yang diambil player
     private void ExecuteUpgradeByID(int id)
     {
         GameObject player = GameObject.FindGameObjectWithTag("Player");
@@ -259,48 +289,39 @@ public class ZombieSpawner : MonoBehaviour
 
         switch (id)
         {
-            case 0: // AK74 Damage
+            case 0: 
                 if (wManager) wManager.fireDamage += 5;
-                Debug.Log($"DeadWave Log: Upgrade Damage Senjata Aktif! Total: {wManager.fireDamage}");
                 break;
             case 1: // Fire Rate
+                // PERBAIKAN UPGRADE: Penyeimbangan dikurangi 0.01f agar setara peningkatan 10%
                 if (wManager) wManager.fireRate = Mathf.Max(0.06f, wManager.fireRate - 0.01f);
-                Debug.Log($"DeadWave Log: Upgrade Fire Rate Aktif! Jeda: {wManager.fireRate}");
                 break;
-            case 2: // Kapasitas Magasin
+            case 2: 
                 if (wManager) { wManager.magCapacity += 10; wManager.ammoInMag += 10; wManager.UpdateAmmoUI(); }
-                Debug.Log("DeadWave Log: Upgrade Kapasitas Magasin Aktif!");
                 break;
-            case 3: // Kecepatan Ayunan Melee & Tinju
+            case 3: 
                 if (wManager) { wManager.meleeCooldown = Mathf.Max(0.25f, wManager.meleeCooldown - 0.08f); wManager.punchCooldown = Mathf.Max(0.2f, wManager.punchCooldown - 0.06f); }
-                Debug.Log("DeadWave Log: Upgrade Kecepatan Ayunan Melee Aktif!");
                 break;
-            case 4: // Jangkauan Jarak Serangan
+            case 4: 
                 if (wManager) { wManager.meleeRange += 0.5f; wManager.punchRange += 0.3f; }
-                Debug.Log("DeadWave Log: Upgrade Jangkauan Melee Aktif!");
                 break;
-            case 5: // Max Darah Player
+            case 5: 
                 if (pHealth) { pHealth.maxHealth += 25; pHealth.SetHealthFromSpawner(pHealth.currentHealth + 25); }
-                Debug.Log("DeadWave Log: Upgrade Max Darah Player Aktif!");
                 break;
-            case 6: // Kapasitas Kantong Tas Peluru
+            case 6: 
                 if (wManager) { wManager.maxCarriableAmmo += 40; wManager.AddCarriableAmmo(40); }
-                Debug.Log("DeadWave Log: Upgrade Kapasitas Tas Peluru Aktif!");
                 break;
         }
 
-        // Potong sisa poin upgrade setelah memilih
         upgradePointsAvailable--;
 
         if (upgradePointsAvailable > 0)
         {
-            // Jika masih punya sisa pilihan (di Wave 2 atau 3), kocok ulang opsi baru biar seru!
             UpdateUpgradeTitleUI();
             RollUpgradeOptions();
         }
         else
         {
-            // Jika jatah memilih sudah habis, tutup panel dan lanjutkan game
             ResumeGameAfterUpgrade();
         }
     }
@@ -327,7 +348,8 @@ public class ZombieSpawner : MonoBehaviour
     private IEnumerator WaveBreakCountdownRoutine()
     {
         currentWave++;
-        zombiesToSpawn += 5; 
+        // Aturan penambahan jumlah zombie otomatis per wave: Wave 2 = 20, Wave 3 = 30
+        zombiesToSpawn = 10 * currentWave; 
 
         for (int i = (int)waveBreakDuration; i > 0; i--)
         {
@@ -375,7 +397,7 @@ public class ZombieSpawner : MonoBehaviour
         {
             currentWave = PlayerPrefs.GetInt("SavedWave", 1);
             totalScore = PlayerPrefs.GetInt("SavedScore", 0);
-            zombiesToSpawn = 5 + ((currentWave - 1) * 5); 
+            zombiesToSpawn = 10 * currentWave; 
 
             GameObject player = GameObject.FindGameObjectWithTag("Player");
             if (player != null)
@@ -395,7 +417,7 @@ public class ZombieSpawner : MonoBehaviour
                     wManager.OnItemEquip(); 
                 }
 
-                PlayerHealth pHealth = pHealth = player.GetComponent<PlayerHealth>();
+                PlayerHealth pHealth = player.GetComponent<PlayerHealth>();
                 if (pHealth != null)
                 {
                     int savedHP = PlayerPrefs.GetInt("SavedPlayerHealth", pHealth.maxHealth);

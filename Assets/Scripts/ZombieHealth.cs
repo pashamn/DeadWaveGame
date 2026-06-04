@@ -64,6 +64,7 @@ public class ZombieHealth : MonoBehaviour
         if (ZombieSpawner.Instance != null)
         {
             ZombieSpawner.Instance.DropLootCrystal(transform.position);
+            ZombieSpawner.Instance.RegisterZombieDeath();
         }
 
         // 3. BARU: Hancurkan objek zombie dari arena permainan

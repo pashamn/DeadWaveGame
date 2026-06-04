@@ -50,6 +50,12 @@ public class DeadWaveItemPickup : MonoBehaviour
         if (weaponToGrant == DeadWaveWeapon.Melee) playerManager.hasMelee = true;
         else if (weaponToGrant == DeadWaveWeapon.Firearm) playerManager.hasFirearm = true;
 
+        // PERBAIKAN TUTORIAL: Matikan garis jalur GPS di lantai karena barang sudah di tangan player!
+        if (DeadWaveQuestTracker.Instance != null)
+        {
+            DeadWaveQuestTracker.Instance.ClearWeaponRoute();
+        }
+
         // 3. Panggil fungsi antrean animasi yang baru di script Player
         playerManager.InteractAndEquipWeapon(weaponToGrant);
 
