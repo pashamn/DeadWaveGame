@@ -1,30 +1,33 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement; // WAJIB: Untuk berpindah scene
 
 public class PlayerHealth : MonoBehaviour
 {
     [Header("Health")]
     public int maxHealth = 100;
 
-    // Diubah menjadi properti public agar bisa dibaca oleh ZombieSpawner saat Save
+    // Properti public get agar bisa dibaca oleh ZombieSpawner saat Save Progress
     public int currentHealth { get; private set; }
 
     public bool IsDead { get; private set; }
 
-    [Header("UI")]
+    [Header("UI Status Bar")]
     public Image healthFill;
+
+    [Header("Main Menu Scene ID Settings")]
+    [Tooltip("Masukkan ID Scene Main Menu kamu dari Build Settings (biasanya 0)")]
+    public int mainMenuSceneIndex = 0;
 
     void Start()
     {
-        // Fungsi Start dikosongkan dari pengaturan darah default.
-        // Sekarang, ZombieSpawner yang akan bertanggung jawab menyetel darah di awal game.
+        // Fungsi Start bersih dari intervensi setelan darah awal
     }
 
     void Update()
     {
-        // PERBAIKAN: Tombol tes damage dipindahkan dari SPACE ke tombol K 
-        // agar tidak bentrok dengan tombol Lompat (Jump) bawaan Invector.
-        if (Input.GetKeyDown(KeyCode.K))
+        // TEST DAMAGE (Tombol Space)
+        if (Input.GetKeyDown(KeyCode.Space))
         {
             TakeDamage(10);
         }
@@ -48,7 +51,6 @@ public class PlayerHealth : MonoBehaviour
         }
     }
 
-    // Fungsi khusus yang dipanggil oleh ZombieSpawner saat game dimulai / di-load
     public void SetHealthFromSpawner(int amount)
     {
         currentHealth = amount;
@@ -73,6 +75,27 @@ public class PlayerHealth : MonoBehaviour
     void Die()
     {
         IsDead = true;
-        Debug.Log("PLAYER DEAD");
+        Debug.Log("PLAYER DEAD - LANGSUNG KEMBALI KE MAIN MENU");
+
+        // 1. Pastikan waktu game berjalan normal (1f) agar scene baru tidak ikut membeku
+        Time.timeScale = 1f;
+
+        // 2. Matikan status pause agar script manajemen lain ikut lepas dari kondisi terkunci
+        if (PauseMenu.isPaused)
+        {
+            PauseMenu.isPaused = false;
+        }
+
+        // 3. Reset data simpanan agar pemain tidak bisa curang "Continue" di wave tinggi setelah mati
+        PlayerPrefs.SetInt("IsContinuingGame", 0);
+        PlayerPrefs.DeleteKey("SavedWave"); 
+        PlayerPrefs.Save();
+
+        // 4. Bebaskan kursor mouse total agar siap digunakan bernavigasi di Main Menu
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+
+        // 5. Eksekusi lempar player langsung ke scene Main Menu
+        SceneManager.LoadScene(mainMenuSceneIndex);
     }
 }

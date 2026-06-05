@@ -64,13 +64,16 @@ public class ZombieSpawner : MonoBehaviour
     void Start()
     {
         if (upgradePanelObject != null) upgradePanelObject.SetActive(false); 
-        if (weaponSuggestPanelObject != null) weaponSuggestPanelObject.SetActive(false); // Sembunyikan panel quest di awal
-        
+        if (weaponSuggestPanelObject != null) weaponSuggestPanelObject.SetActive(false); 
+
         UpdateScoreUI();
         UpdateWaveUI(); 
         if (questUIText != null) questUIText.text = "";
         
         int isContinuing = PlayerPrefs.GetInt("IsContinuingGame", 0);
+
+        // 1. CARI PLAYER CUKUP SATU KALI DI SINI (Deklarasi Utama)
+        GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
 
         if (isContinuing == 1)
         {
@@ -83,10 +86,10 @@ public class ZombieSpawner : MonoBehaviour
             currentWave = 1;
             zombiesToSpawn = 10; 
             
-            GameObject player = GameObject.FindGameObjectWithTag("Player");
-            if (player != null)
+            // Menggunakan variabel playerObj yang sudah dicari di atas
+            if (playerObj != null)
             {
-                PlayerHealth pHealth = player.GetComponent<PlayerHealth>();
+                PlayerHealth pHealth = playerObj.GetComponent<PlayerHealth>();
                 if (pHealth != null)
                 {
                     pHealth.SetHealthFromSpawner(pHealth.maxHealth);
@@ -99,6 +102,17 @@ public class ZombieSpawner : MonoBehaviour
             zombieLeftText.text = $"Zombies: {zombiesToSpawn}";
         }
         
+        // 2. LOGIKA RESET INVECTOR (Sudah disatukan menggunakan playerObj tanpa membuat variabel baru)
+        if (playerObj != null && isContinuing == 0)
+        {
+            var cc = playerObj.GetComponent<Invector.vCharacterController.vThirdPersonController>();
+            if (cc != null)
+            {
+                cc.enabled = false;
+                cc.enabled = true;
+            }
+        }
+
         StartCoroutine(GameStartCountdown());
     }
 

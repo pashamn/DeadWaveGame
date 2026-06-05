@@ -8257,6 +8257,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerHealth
   maxHealth: 100
   healthFill: {fileID: 484827454}
+  mainMenuSceneIndex: 0
 --- !u!114 &1383225738
 MonoBehaviour:
   m_ObjectHideFlags: 0
