@@ -1,9 +1,10 @@
 using UnityEngine;
+using UnityEngine.UI; // WAJIB: Untuk mengontrol komponen UI Image bawaan Unity
 
 public class ZombieBossHealth : MonoBehaviour
 {
     [Header("Boss Health Settings")]
-    public int maxHealth = 500; // Darah Boss lebih tebal dari kroco
+    public int maxHealth = 500; 
     private int currentHealth;
 
     private Animator animator;
@@ -11,27 +12,72 @@ public class ZombieBossHealth : MonoBehaviour
 
     public bool IsDead { get; private set; }
 
+    [Header("UI World Space Health Bar (Sesuai Gambar Hierarchy)")]
+    [Tooltip("Tarik objek bernama 'Fill' dari Hierarchy kepala Boss ke slot ini")]
+    public Image fill; 
+    [Tooltip("Tarik objek induk bernama 'Healt' dari Hierarchy kepala Boss ke slot ini")]
+    public GameObject healt;
+
+    private Transform mainCameraTransform;
+
     void Start()
     {
         currentHealth = maxHealth;
+
         bossController = GetComponent<ZombieBossController>();
         animator = GetComponent<Animator>();
+
+        // Ambil referensi kamera utama untuk efek melayang menghadap player
+        if (Camera.main != null)
+        {
+            mainCameraTransform = Camera.main.transform;
+        }
+
+        // Setel tampilan awal bar darah ke posisi penuh (100% / 1f)
+        if (fill != null)
+        {
+            fill.fillAmount = 1f;
+        }
     }
 
-    // Fungsi ini dipanggil oleh sistem senjata Player saat menembak Boss
+    void LateUpdate()
+    {
+        // BILLBOARD EFFECT: Memaksa objek Healt di atas kepala Boss agar selalu 
+        // berputar menghadap lurus ke mata kamera Player (Anti-Miring)
+        if (healt != null && mainCameraTransform != null)
+        {
+            healt.transform.LookAt(healt.transform.position + mainCameraTransform.forward);
+        }
+    }
+
+    void Update()
+    {
+        // MANUAL TESTING DAMAGE (Tekan K di keyboard untuk mengurangi darah Boss saat demo)
+        if (Input.GetKeyDown(KeyCode.K))
+        {
+            TakeDamage(50);
+        }
+    }
+
     public void TakeDamage(int damage)
     {
         if (IsDead) return;
 
         currentHealth -= damage;
-        Debug.Log($"Boss HP: {currentHealth}");
+        Debug.Log($"DeadWave Boss Log: HP Boss berkurang! Sisa HP: {currentHealth}");
 
-        // Jika masih hidup, mainkan animasi "gethit1" bawaan Mutant 7
+        // UPDATE UI FILL: Hitung persentase darah menggunakan pembagian float (current / max)
+        if (fill != null)
+        {
+            fill.fillAmount = (float)currentHealth / maxHealth;
+        }
+
         if (currentHealth > 0)
         {
             if (animator != null) animator.Play("gethit1");
         }
-        else
+
+        if (currentHealth <= 0)
         {
             Die();
         }
@@ -39,23 +85,27 @@ public class ZombieBossHealth : MonoBehaviour
 
     void Die()
     {
-        if (IsDead) return;
+        if (IsDead) return; 
         IsDead = true;
 
-        // 1. Jalankan fungsi mati di controller agar Boss berhenti bergerak dan memutar animasi death
         if (bossController != null)
         {
             bossController.TriggerBossDeath();
         }
 
-        // 2. Lapor ke Spawner agar Wave bisa dianggap selesai/score bertambah
+        // TAMAT INSTAN: Panggil fungsi interupsi spawner agar langsung memicu Game Clear tanpa nunggu kroco mati semua
         if (ZombieSpawner.Instance != null)
         {
             ZombieSpawner.Instance.DropLootCrystal(transform.position);
-            ZombieSpawner.Instance.RegisterZombieDeath();
+            ZombieSpawner.Instance.RegisterBossDeath();
         }
 
-        // 3. Hancurkan objek setelah 5 detik agar animasi mati selesai diputar
+        // Hancurkan/Matikan UI induk Healt melayang seketika saat Boss terkapar jatuh
+        if (healt != null)
+        {
+            healt.SetActive(false);
+        }
+
         Destroy(gameObject, 5f);
     }
 }

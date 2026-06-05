@@ -2,6 +2,7 @@ using UnityEngine;
 using System.Collections;
 using System.Collections.Generic; // WAJIB: Untuk menggunakan List dalam pengacakan
 using TMPro;
+using UnityEngine.SceneManagement; // WAJIB: Ditambahkan untuk fungsi pindah Scene / Main Menu
 
 public class ZombieSpawner : MonoBehaviour
 {
@@ -10,7 +11,7 @@ public class ZombieSpawner : MonoBehaviour
     [Header("Zombie Prefab & Loot")]
     public GameObject zombiePrefab;
     [Tooltip("Tarik master Prefab Zombie Boss (MonsterMutant7) kalian ke sini")]
-    public GameObject bossPrefab; // BARU: Slot untuk menampung master Prefab Boss
+    public GameObject bossPrefab; 
     [Tooltip("Tarik master Prefab Box Peluru Bermagnet ke sini")]
     public GameObject ammoBoxPrefab;        
     [Tooltip("Tarik master Prefab Medkit Bermagnet ke sini")]
@@ -19,7 +20,7 @@ public class ZombieSpawner : MonoBehaviour
     [Header("Wave Settings")]
     public int currentWave = 1;
     [Tooltip("Tentukan Wave berapa Boss Utama akan muncul")]
-    public int finalWaveNumber = 3; // BARU: Pengunci pintu tantangan Final Wave
+    public int finalWaveNumber = 3; 
     public int zombiesToSpawn = 10; 
     public int maxZombiesAlive = 3;
     public float spawnRate = 2f;
@@ -45,6 +46,14 @@ public class ZombieSpawner : MonoBehaviour
     public TextMeshProUGUI questUIText;      
     public GameObject upgradePanelObject;   
 
+    [Header("UI Game Clear / Victory Panel")]
+    [Tooltip("Tarik objek Game Object Panel Game Clear kalian ke slot ini")]
+    public GameObject gameClearPanelObject; 
+    [Tooltip("Tarik teks TMP yang khusus menampilkan score di panel Game Clear")]
+    public TextMeshProUGUI finalScoreUIText; 
+    [Tooltip("Tulis nama Scene Main Menu kelompok kalian di sini secara tepat (misal: MainMenu atau Home)")]
+    public string mainMenuSceneName = "MainMenu"; 
+
     [Header("UI Button Texts (Gacha Setup)")]
     public TextMeshProUGUI buttonTextOption1;
     public TextMeshProUGUI buttonTextOption2;
@@ -55,7 +64,7 @@ public class ZombieSpawner : MonoBehaviour
     private int zombiesKilled;
     private int totalScore = 0;             
     private bool isWaveActive = false;      
-    private bool isBossSpawnedInFinalWave = false; // BARU: Gembok agar Boss hanya keluar tepat 1 kali
+    private bool isBossSpawnedInFinalWave = false; 
 
     private int upgradePointsAvailable = 0; 
     private List<int> currentRolledUpgrades = new List<int>(); 
@@ -70,6 +79,7 @@ public class ZombieSpawner : MonoBehaviour
     {
         if (upgradePanelObject != null) upgradePanelObject.SetActive(false); 
         if (weaponSuggestPanelObject != null) weaponSuggestPanelObject.SetActive(false); 
+        if (gameClearPanelObject != null) gameClearPanelObject.SetActive(false); 
 
         UpdateScoreUI();
         UpdateWaveUI(); 
@@ -77,7 +87,6 @@ public class ZombieSpawner : MonoBehaviour
         
         int isContinuing = PlayerPrefs.GetInt("IsContinuingGame", 0);
 
-        // 1. CARI PLAYER CUKUP SATU KALI DI SINI (Deklarasi Utama)
         GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
 
         if (isContinuing == 1)
@@ -91,7 +100,6 @@ public class ZombieSpawner : MonoBehaviour
             currentWave = 1;
             zombiesToSpawn = 10; 
             
-            // Menggunakan variabel playerObj yang sudah dicari di atas
             if (playerObj != null)
             {
                 PlayerHealth pHealth = playerObj.GetComponent<PlayerHealth>();
@@ -107,7 +115,6 @@ public class ZombieSpawner : MonoBehaviour
             zombieLeftText.text = $"Zombies: {zombiesToSpawn}";
         }
         
-        // 2. LOGIKA RESET INVECTOR (Sudah disatukan menggunakan playerObj tanpa membuat variabel baru)
         if (playerObj != null && isContinuing == 0)
         {
             var cc = playerObj.GetComponent<Invector.vCharacterController.vThirdPersonController>();
@@ -125,7 +132,6 @@ public class ZombieSpawner : MonoBehaviour
     {
         isWaveActive = false;
 
-        // GANTI-GANTIAN: Munculkan Teks Hitung Mundur, Sembunyikan Kotak Wave & Zombie Left
         if (countdownCanvasObject != null) countdownCanvasObject.SetActive(true);
         if (waveCanvasObject != null) waveCanvasObject.SetActive(false);
 
@@ -135,7 +141,6 @@ public class ZombieSpawner : MonoBehaviour
             yield return new WaitForSeconds(1f);
         }
         
-        // GANTI-GANTIAN: Matikan Teks Hitung Mundur, Munculkan Kotak Wave kembali
         if (countdownCanvasObject != null) countdownCanvasObject.SetActive(false);
         if (waveCanvasObject != null) waveCanvasObject.SetActive(true);
 
@@ -154,11 +159,10 @@ public class ZombieSpawner : MonoBehaviour
             zombiesToSpawn = 10; 
         }
 
-        // BARU: Jika masuk Final Wave, ubah kuota zombie dan tampilkan peringatan horror
         if (currentWave >= finalWaveNumber)
         {
             isBossSpawnedInFinalWave = false;
-            zombiesToSpawn = 15; // Contoh: 1 Boss + 14 Kroco Pengawal
+            zombiesToSpawn = 15; 
             if (countdownCanvasObject != null) countdownCanvasObject.SetActive(true);
             if (countdownUIText != null) countdownUIText.text = "BOSS MUNCUL!";
             Invoke(nameof(HideFinalWaveAlert), 4f);
@@ -186,7 +190,6 @@ public class ZombieSpawner : MonoBehaviour
 
             if (activeZombies.Length < maxZombiesAlive)
             {
-                // BARU: Logika peniupan terompet Boss Final Wave
                 if (currentWave >= finalWaveNumber && !isBossSpawnedInFinalWave)
                 {
                     SpawnBoss();
@@ -221,18 +224,55 @@ public class ZombieSpawner : MonoBehaviour
         {
             isWaveActive = false; 
 
-            // BARU: Tamatkan permainan jika Final Wave sukses dibersihkan bersih
             if (currentWave >= finalWaveNumber)
             {
-                if (countdownCanvasObject != null) countdownCanvasObject.SetActive(true);
-                if (countdownUIText != null) countdownUIText.text = "CONGRATULATIONS! GAME CLEAR!";
-                Time.timeScale = 0.2f; // Efek lambat kemenangan yang dramatis saat dinilai dosen
+                TriggerGameClearVictory();
             }
             else
             {
                 StartCoroutine(WaveClearRoutine());
             }
         }
+    }
+
+    // Fungsi interupsi instan khusus saat Zombie Boss mati (Pemicu Instant Win)
+    public void RegisterBossDeath()
+    {
+        if (currentWave >= finalWaveNumber)
+        {
+            isWaveActive = false;
+            AddScore(500);
+            TriggerGameClearVictory();
+        }
+    }
+
+    private void TriggerGameClearVictory()
+    {
+        Debug.Log("DeadWave Log: Game Tamat! Membuka panel kemenangan...");
+
+        if (countdownCanvasObject != null) countdownCanvasObject.SetActive(false);
+        if (waveCanvasObject != null) waveCanvasObject.SetActive(false);
+        if (weaponSuggestPanelObject != null) weaponSuggestPanelObject.SetActive(false);
+
+        if (gameClearPanelObject != null)
+        {
+            gameClearPanelObject.SetActive(true);
+        }
+
+        if (finalScoreUIText != null)
+        {
+            finalScoreUIText.text = $"FINAL EXP: {totalScore}";
+        }
+
+        Time.timeScale = 0f; 
+        Cursor.lockState = CursorLockMode.None; 
+        Cursor.visible = true; 
+    }
+
+    public void BackToMainMenuButtonAction()
+    {
+        Time.timeScale = 1f; 
+        SceneManager.LoadScene(mainMenuSceneName); 
     }
 
     void SpawnZombie()
@@ -246,7 +286,6 @@ public class ZombieSpawner : MonoBehaviour
         Instantiate(zombiePrefab, randomPosition, Quaternion.identity);
     }
 
-    // BARU: Fungsi internal pembuat bodi Boss di arena pertempuran
     void SpawnBoss()
     {
         Vector3 randomPosition = transform.position + new Vector3(
@@ -258,7 +297,7 @@ public class ZombieSpawner : MonoBehaviour
         if (bossPrefab != null)
         {
             GameObject bossObj = Instantiate(bossPrefab, randomPosition, Quaternion.identity);
-            bossObj.tag = "Zombie"; // Paksa tag menjadi Zombie agar sinkron dengan baris penghitung sisa musuh
+            bossObj.tag = "Zombie"; 
             Debug.Log("<color=purple>DeadWave Log: Master Boss Tercipta di Peta!</color>");
         }
         else
@@ -270,7 +309,7 @@ public class ZombieSpawner : MonoBehaviour
     public void RegisterZombieDeath()
     {
         zombiesKilled++;
-        AddScore(100); // BARU: Tambah EXP/Score otomatis tiap kali musuh mati
+        AddScore(100); 
 
         if (currentWave == 1)
         {
@@ -299,15 +338,12 @@ public class ZombieSpawner : MonoBehaviour
         if (questUIText != null) questUIText.text = questMessage;
         if (weaponSuggestPanelObject != null) weaponSuggestPanelObject.SetActive(true);
 
-        // Freeze game total
         Time.timeScale = 0f;
 
         if (DeadWaveQuestTracker.Instance != null) DeadWaveQuestTracker.Instance.ActivationWeaponRoute(routeID);
 
-        // Tunggu 5 detik nyata walaupun game sedang freeze
         yield return new WaitForSecondsRealtime(5f);
 
-        // Unfreeze game kembali normal
         Time.timeScale = 1f;
 
         if (questUIText != null) questUIText.text = "";
@@ -585,14 +621,13 @@ public class ZombieSpawner : MonoBehaviour
     {
         if (waveUIText != null)
         {
-            // Jika wave saat ini sudah mencapai atau melewati batas finalWaveNumber
             if (currentWave >= finalWaveNumber)
             {
-                waveUIText.text = "Final Wave"; // Ubah tampilan teks Canvas menjadi "Final Wave"
+                waveUIText.text = "Final Wave"; 
             }
             else
             {
-                waveUIText.text = $"Wave {currentWave}"; // Wave biasa tetap menampilkan angka
+                waveUIText.text = $"Wave {currentWave}"; 
             }
         }
     }
