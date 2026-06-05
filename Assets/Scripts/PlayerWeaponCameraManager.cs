@@ -88,6 +88,9 @@ public class PlayerWeaponCameraManager : MonoBehaviour
         public float rightOffset;
     }
 
+    [Header("UI")]
+    public GameObject crosshairUI;
+
     [Header("Camera Profiles Settings")]
     public CameraValues punchCamera   = new CameraValues { distance = 3.0f, height = 1.4f, rightOffset = 0.0f };
     public CameraValues meleeCamera   = new CameraValues { distance = 2.5f, height = 1.3f, rightOffset = 0.3f };
@@ -109,6 +112,8 @@ public class PlayerWeaponCameraManager : MonoBehaviour
     {
         ApplyWeaponLayerState();
         UpdateAmmoUI(); 
+        UpdateCrosshair();
+
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
@@ -298,6 +303,7 @@ public class PlayerWeaponCameraManager : MonoBehaviour
         }
 
         SetWeaponObjects(activeWeapon);
+        UpdateCrosshair();
     }
 
     private void SetWeaponObjects(DeadWaveWeapon w)
@@ -306,6 +312,13 @@ public class PlayerWeaponCameraManager : MonoBehaviour
         if (meleeMeshObject)   meleeMeshObject.SetActive(w == DeadWaveWeapon.Melee);
         if (firearmMeshObject) firearmMeshObject.SetActive(w == DeadWaveWeapon.Firearm);
     }
+
+    private void UpdateCrosshair()
+{
+    if (crosshairUI == null) return;
+
+    crosshairUI.SetActive(activeWeapon == DeadWaveWeapon.Firearm);
+}
 
     public void TriggerReload()
     {
