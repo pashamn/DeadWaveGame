@@ -24,11 +24,21 @@ public class ZombieSpawner : MonoBehaviour
     [Header("Spawn Area")]
     public float spawnRadius = 5f;
 
+    [Header("UI Canvas Groups (Hanya Untuk Wave)")]
+    [Tooltip("Tarik GameObject/Panel Teks 'CountDown' ke sini")]
+    public GameObject countdownCanvasObject; 
+    [Tooltip("Tarik GameObject/Panel Teks 'Wave' ke sini")]
+    public GameObject waveCanvasObject;   
+    [Tooltip("Tarik GameObject Parent 'WeaponSuggest' ke sini")]
+    public GameObject weaponSuggestPanelObject;
+
     [Header("UI Canvas Settings")]
     public TextMeshProUGUI waveUIText;       
     public TextMeshProUGUI countdownUIText;  
     public TextMeshProUGUI zombieLeftText;  
     public TextMeshProUGUI scoreUIText;     
+    [Tooltip("Tarik objek teks 'quest' ke sini")]
+    public TextMeshProUGUI questUIText;      
     public GameObject upgradePanelObject;   
 
     [Header("UI Button Texts (Gacha Setup)")]
@@ -54,8 +64,11 @@ public class ZombieSpawner : MonoBehaviour
     void Start()
     {
         if (upgradePanelObject != null) upgradePanelObject.SetActive(false); 
+        if (weaponSuggestPanelObject != null) weaponSuggestPanelObject.SetActive(false); // Sembunyikan panel quest di awal
+        
         UpdateScoreUI();
         UpdateWaveUI(); 
+        if (questUIText != null) questUIText.text = "";
         
         int isContinuing = PlayerPrefs.GetInt("IsContinuingGame", 0);
 
@@ -92,11 +105,21 @@ public class ZombieSpawner : MonoBehaviour
     private IEnumerator GameStartCountdown()
     {
         isWaveActive = false;
+
+        // GANTI-GANTIAN: Munculkan Teks Hitung Mundur, Sembunyikan Kotak Wave & Zombie Left
+        if (countdownCanvasObject != null) countdownCanvasObject.SetActive(true);
+        if (waveCanvasObject != null) waveCanvasObject.SetActive(false);
+
         for (int i = 5; i > 0; i--)
         {
             if (countdownUIText != null) countdownUIText.text = $"Mulai dalam: {i}";
             yield return new WaitForSeconds(1f);
         }
+        
+        // GANTI-GANTIAN: Matikan Teks Hitung Mundur, Munculkan Kotak Wave kembali
+        if (countdownCanvasObject != null) countdownCanvasObject.SetActive(false);
+        if (waveCanvasObject != null) waveCanvasObject.SetActive(true);
+
         if (countdownUIText != null) countdownUIText.text = "";
         StartNewWave();
     }
@@ -173,39 +196,49 @@ public class ZombieSpawner : MonoBehaviour
 
         if (currentWave == 1)
         {
-            wave1KillCounter++;
-
-            if (wave1KillCounter == 2)
-            {
-                if (countdownUIText != null) 
-                {
-                    countdownUIText.text = "ZOMBIE TUMBANG! IKUTI JALUR DI LANTAI UNTUK MENGAMBIL LINGGIS (TEKAN E)";
-                    Invoke(nameof(ClearCountdownText), 5f);
-                }
-                if (DeadWaveQuestTracker.Instance != null) DeadWaveQuestTracker.Instance.ActivationWeaponRoute(1);
-            }
-            else if (wave1KillCounter == 5) 
-            {
-                if (countdownUIText != null) 
-                {
-                    countdownUIText.text = "PERSENJATAAN BERAT! IKUTI JALUR LANTAI MENUJU RIFLE AK74 (TEKAN E)";
-                    Invoke(nameof(ClearCountdownText), 5f);
-                }
-                if (DeadWaveQuestTracker.Instance != null) DeadWaveQuestTracker.Instance.ActivationWeaponRoute(2);
-            }
+            wave1CounterLogic();
         }
     }
 
-    private void ClearCountdownText()
+    private void wave1CounterLogic()
     {
-        if (countdownUIText != null) countdownUIText.text = "";
+        wave1KillCounter++;
+
+        if (wave1KillCounter == 2)
+        {
+            string pesan = "ZOMBIE TUMBANG! IKUTI JALUR DI LANTAI UNTUK MENGAMBIL LINGGIS";
+            StartCoroutine(ShowQuestAndFreezeRoutine(pesan, 1));
+        }
+        else if (wave1KillCounter == 5) 
+        {
+            string pesan = "PERSENJATAAN BERAT! IKUTI JALUR LANTAI MENUJU RIFLE AK74";
+            StartCoroutine(ShowQuestAndFreezeRoutine(pesan, 2));
+        }
     }
 
-    // Mengacak apakah yang jatuh Box Peluru (70%) atau Medkit (30%)
-    // PERBAIKAN CERDAS: Drop disesuaikan dengan senjata yang dipegang Player
+    // COROUTINE TUTORIAL: Memunculkan quest, menyalakan panel WeaponSuggest, dan freeze game 5 detik nyata
+    private IEnumerator ShowQuestAndFreezeRoutine(string questMessage, int routeID)
+    {
+        if (questUIText != null) questUIText.text = questMessage;
+        if (weaponSuggestPanelObject != null) weaponSuggestPanelObject.SetActive(true);
+
+        // Freeze game total
+        Time.timeScale = 0f;
+
+        if (DeadWaveQuestTracker.Instance != null) DeadWaveQuestTracker.Instance.ActivationWeaponRoute(routeID);
+
+        // Tunggu 5 detik nyata walaupun game sedang freeze
+        yield return new WaitForSecondsRealtime(5f);
+
+        // Unfreeze game kembali normal
+        Time.timeScale = 1f;
+
+        if (questUIText != null) questUIText.text = "";
+        if (weaponSuggestPanelObject != null) weaponSuggestPanelObject.SetActive(false);
+    }
+
     public void DropLootCrystal(Vector3 zombiePosition)
     {
-        // 1. Cari script manager senjata di tubuh player untuk mengecek inventory
         GameObject player = GameObject.FindGameObjectWithTag("Player");
         bool playerHasGun = false;
 
@@ -233,14 +266,14 @@ public class ZombieSpawner : MonoBehaviour
 
         int chance = Random.Range(1, 101); 
 
-        if (chance <= 50) // Peluang 70% menjatuhkan Box Peluru
+        if (chance <= 50) 
         {
             if (ammoBoxPrefab != null)
             {
                 Instantiate(ammoBoxPrefab, zombiePosition + Vector3.up * 0.5f, Quaternion.identity);
             }
         }
-        else // Peluang 30% menjatuhkan Medkit
+        else 
         {
             if (medkitPrefab != null)
             {
@@ -252,6 +285,9 @@ public class ZombieSpawner : MonoBehaviour
     private IEnumerator WaveClearRoutine()
     {
         Debug.Log($"DeadWave Log: WAVE {currentWave} SELESAI!");
+        
+        if (countdownCanvasObject != null) countdownCanvasObject.SetActive(true);
+        if (waveCanvasObject != null) waveCanvasObject.SetActive(false);
         if (countdownUIText != null) countdownUIText.text = "WAVE CLEAR!";
         
         SaveGameProgress();
@@ -299,7 +335,7 @@ public class ZombieSpawner : MonoBehaviour
         return id switch
         {
             0 => "AK74 Damage (+5)",
-            1 => "Fire Rate (+10%)", // Sudah seimbang 10%
+            1 => "Fire Rate (+10%)", 
             2 => "Kapasitas Magasin (+10)",
             3 => "Spam Ayunan Melee (+15%)",
             4 => "Jangkauan Pukulan (+0.5m)",
@@ -383,11 +419,17 @@ public class ZombieSpawner : MonoBehaviour
         currentWave++;
         zombiesToSpawn = 10 * currentWave; 
 
+        if (countdownCanvasObject != null) countdownCanvasObject.SetActive(true);
+        if (waveCanvasObject != null) waveCanvasObject.SetActive(false);
+
         for (int i = (int)waveBreakDuration; i > 0; i--)
         {
             if (countdownUIText != null) countdownUIText.text = $"NEXT WAVE IN: {i}s";
             yield return new WaitForSeconds(1f);
         }
+
+        if (countdownCanvasObject != null) countdownCanvasObject.SetActive(false);
+        if (waveCanvasObject != null) waveCanvasObject.SetActive(true);
 
         if (countdownUIText != null) countdownUIText.text = "";
         StartNewWave();
