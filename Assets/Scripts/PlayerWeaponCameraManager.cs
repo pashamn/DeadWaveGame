@@ -11,10 +11,18 @@ public class PlayerWeaponCameraManager : MonoBehaviour
     private int lastPunchID = 1;
     private bool isPickingUp = false;
 
-    [Header("Weapon Objects")]
+    [Header("Weapon Objects (In-Game Mesh)")]
     public GameObject punchMeshObject;
     public GameObject meleeMeshObject;
     public GameObject firearmMeshObject;
+
+    [Header("UI Weapon Icons Settings (BARU)")]
+    [Tooltip("Tarik objek UI 'Fist' dari Canvas ke slot ini")]
+    public GameObject fistUIIconObject;
+    [Tooltip("Tarik objek UI 'Crowbar' dari Canvas ke slot ini")]
+    public GameObject crowbarUIIconObject;
+    [Tooltip("Tarik objek UI 'Gun' dari Canvas ke slot ini")]
+    public GameObject gunUIIconObject;
 
     [Header("Sistem Tembakan Proyektil")]
     public Transform firePoint;             
@@ -77,7 +85,7 @@ public class PlayerWeaponCameraManager : MonoBehaviour
     [Header("Invector & Unity References")]
     private vThirdPersonController controller;
     private vThirdPersonCamera      vCam;
-    private Animator                animator;
+    private Animator                 animator;
     private AudioSource             audioSource; 
 
     [System.Serializable]
@@ -114,19 +122,17 @@ public class PlayerWeaponCameraManager : MonoBehaviour
         UpdateAmmoUI(); 
         UpdateCrosshair();
 
-
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
     }
 
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Escape))
-        {
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
-        }
-        if (Input.GetMouseButtonDown(0) && !Cursor.visible)
+        // BARU: Jika game sedang dalam posisi Pause, hentikan semua fungsi input di bawah ini
+        if (PauseMenu.isPaused) return;
+
+        // HAPUS / GANTI logika Escape lama dengan deteksi klik area game untuk mengunci cursor
+        if (Input.GetMouseButtonDown(0))
         {
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
@@ -303,6 +309,7 @@ public class PlayerWeaponCameraManager : MonoBehaviour
         }
 
         SetWeaponObjects(activeWeapon);
+        UpdateWeaponUIIcons(activeWeapon); // BARU: Dipanggil agar UI Ikon Canvas ikut ter-update otomatis
         UpdateCrosshair();
     }
 
@@ -313,12 +320,19 @@ public class PlayerWeaponCameraManager : MonoBehaviour
         if (firearmMeshObject) firearmMeshObject.SetActive(w == DeadWaveWeapon.Firearm);
     }
 
-    private void UpdateCrosshair()
-{
-    if (crosshairUI == null) return;
+    // FUNGSI BARU: Logika penukaran status hidup/mati UI ikon senjata secara ganti-gantian
+    private void UpdateWeaponUIIcons(DeadWaveWeapon w)
+    {
+        if (fistUIIconObject)    fistUIIconObject.SetActive(w == DeadWaveWeapon.Punch);
+        if (crowbarUIIconObject) crowbarUIIconObject.SetActive(w == DeadWaveWeapon.Melee);
+        if (gunUIIconObject)     gunUIIconObject.SetActive(w == DeadWaveWeapon.Firearm);
+    }
 
-    crosshairUI.SetActive(activeWeapon == DeadWaveWeapon.Firearm);
-}
+    private void UpdateCrosshair()
+    {
+        if (crosshairUI == null) return;
+        crosshairUI.SetActive(activeWeapon == DeadWaveWeapon.Firearm);
+    }
 
     public void TriggerReload()
     {
@@ -334,7 +348,6 @@ public class PlayerWeaponCameraManager : MonoBehaviour
 
         yield return new WaitForSeconds(1.2f); 
 
-        // PERBAIKAN UTAMA: Perhitungan reload sekarang dinamis mengikuti variabel magCapacity hasil upgrade!
         int ammoNeeded = magCapacity - ammoInMag; 
         int ammoToTransfer = Mathf.Min(ammoNeeded, carriableAmmo);
 
@@ -523,7 +536,6 @@ public class PlayerWeaponCameraManager : MonoBehaviour
         Debug.Log($"DeadWave Log: Peluru Cadangan Ditambahkan! Total: {carriableAmmo}");
     }
 
-    // PERBAIKAN: Fungsi ini diaktifkan agar saat panel ditutup, UI teks amunisi langsung dipaksa refresh
     public void UpgradeWeaponStats(int waveSelesai)
     {
         UpdateAmmoUI();
