@@ -1181,7 +1181,7 @@ PrefabInstance:
     - target: {fileID: 5866666021909216657, guid: 80d02e030bac2b4499da6fc3356762a1, type: 3}
       propertyPath: m_Controller
       value: 
-      objectReference: {fileID: 9100000, guid: f888ef05aaf8d4240a7b7f717bdc358a, type: 2}
+      objectReference: {fileID: 9100000, guid: 4da48cfecb290244f9df540bc4b2ff8b, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -2833,9 +2833,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6c9a6b2e2d7f1124bac6ed68d87f1314, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ZombieBossTester
-  playerTransform: {fileID: 1383225735}
-  attackDistance: 3
-  attackCooldown: 1.5
+  maxHp: 300
+  baseSpeed: 3
+  attackRange: 1.8
+  leapMinRange: 4
+  leapMaxRange: 7
+  leapCooldown: 4
 --- !u!195 &400399951
 NavMeshAgent:
   m_ObjectHideFlags: 0
