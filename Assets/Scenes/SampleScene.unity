@@ -1825,10 +1825,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ZombieSpawner
   zombiePrefab: {fileID: 3250376631927173630, guid: e7493e0bcf3341c43b1fa07e3f87e505, type: 3}
+  bossPrefab: {fileID: 3691595589555382084, guid: a057aaadc0e3fb342a33fefc0ef00122, type: 3}
   ammoBoxPrefab: {fileID: 7286107826647051149, guid: afeecaba6db5dae44a4c348ce748d850, type: 3}
   medkitPrefab: {fileID: 6505714397270823818, guid: 5d256a3ec4526c64abc435b1df250bcd, type: 3}
-  currentWave: 1
-  zombiesToSpawn: 0
+  currentWave: 2
+  finalWaveNumber: 3
+  zombiesToSpawn: 2
   maxZombiesAlive: 3
   spawnRate: 3
   waveBreakDuration: 30
@@ -3943,10 +3945,10 @@ RectTransform:
   - {fileID: 1631353142}
   m_Father: {fileID: 1609962607}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 200, y: -125}
-  m_SizeDelta: {x: 400, y: 250}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &486705550
 MonoBehaviour:
@@ -4506,10 +4508,10 @@ RectTransform:
   - {fileID: 1823247787}
   m_Father: {fileID: 1609962607}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 1000, y: -125}
-  m_SizeDelta: {x: 400, y: 250}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &541009927
 MonoBehaviour:
@@ -4708,11 +4710,11 @@ RectTransform:
   - {fileID: 1577407909}
   - {fileID: 159361163}
   - {fileID: 26516880}
-  - {fileID: 1568738115}
   - {fileID: 533977533}
   - {fileID: 2019676340}
   - {fileID: 322357175}
   - {fileID: 424377571}
+  - {fileID: 1568738115}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -6335,10 +6337,10 @@ RectTransform:
   - {fileID: 1769306221}
   m_Father: {fileID: 1609962607}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 600, y: -125}
-  m_SizeDelta: {x: 400, y: 250}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &949619219
 MonoBehaviour:
@@ -9164,7 +9166,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1568738115
 RectTransform:
   m_ObjectHideFlags: 0

@@ -86,7 +86,7 @@ public class PlayerWeaponCameraManager : MonoBehaviour
     private vThirdPersonController controller;
     private vThirdPersonCamera      vCam;
     private Animator                 animator;
-    private AudioSource             audioSource; 
+    private AudioSource              audioSource; 
 
     [System.Serializable]
     public struct CameraValues
@@ -128,10 +128,10 @@ public class PlayerWeaponCameraManager : MonoBehaviour
 
     private void Update()
     {
-        // BARU: Jika game sedang dalam posisi Pause, hentikan semua fungsi input di bawah ini
-        if (PauseMenu.isPaused) return;
+        // BARU: Jika game sedang dalam posisi Pause, atau SEDANG FREEZE MEMILIH UPGRADE PANEL, kunci total fungsi input
+        if (PauseMenu.isPaused || Mathf.Approximately(Time.timeScale, 0f)) return;
 
-        // HAPUS / GANTI logika Escape lama dengan deteksi klik area game untuk mengunci cursor
+        // Hanya deteksi klik area layar game untuk mengunci kursor jika game sedang berjalan aktif normal
         if (Input.GetMouseButtonDown(0))
         {
             Cursor.lockState = CursorLockMode.Locked;
@@ -309,7 +309,7 @@ public class PlayerWeaponCameraManager : MonoBehaviour
         }
 
         SetWeaponObjects(activeWeapon);
-        UpdateWeaponUIIcons(activeWeapon); // BARU: Dipanggil agar UI Ikon Canvas ikut ter-update otomatis
+        UpdateWeaponUIIcons(activeWeapon); 
         UpdateCrosshair();
     }
 
@@ -320,7 +320,6 @@ public class PlayerWeaponCameraManager : MonoBehaviour
         if (firearmMeshObject) firearmMeshObject.SetActive(w == DeadWaveWeapon.Firearm);
     }
 
-    // FUNGSI BARU: Logika penukaran status hidup/mati UI ikon senjata secara ganti-gantian
     private void UpdateWeaponUIIcons(DeadWaveWeapon w)
     {
         if (fistUIIconObject)    fistUIIconObject.SetActive(w == DeadWaveWeapon.Punch);
@@ -476,14 +475,21 @@ public class PlayerWeaponCameraManager : MonoBehaviour
         foreach (Collider col in Physics.OverlapSphere(rayOrigin, 0.8f))
         {
             if (col.gameObject == gameObject) continue;
+            
             ZombieHealth zombie = col.GetComponentInParent<ZombieHealth>();
             if (zombie != null) { zombie.TakeDamage(damage); return; }
+
+            ZombieBossHealth boss = col.GetComponentInParent<ZombieBossHealth>();
+            if (boss != null) { boss.TakeDamage(damage); return; }
         }
 
         if (Physics.SphereCast(rayOrigin, 0.4f, rayDirection, out RaycastHit hit, range))
         {
             ZombieHealth zombie = hit.transform.GetComponentInParent<ZombieHealth>();
-            if (zombie != null) zombie.TakeDamage(damage);
+            if (zombie != null) { zombie.TakeDamage(damage); return; }
+
+            ZombieBossHealth boss = hit.transform.GetComponentInParent<ZombieBossHealth>();
+            if (boss != null) { boss.TakeDamage(damage); return; }
         }
     }
 

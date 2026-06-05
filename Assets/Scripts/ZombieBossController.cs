@@ -1,126 +1,271 @@
 using UnityEngine;
 using UnityEngine.AI;
+using System.Collections;
 
 public class ZombieBossController : MonoBehaviour
 {
-    public float maxHp = 300f;
-    public float baseSpeed = 3f;
-    public float attackRange = 1.8f;
-    public float leapMinRange = 4f;
-    public float leapMaxRange = 7f;
-    public float leapCooldown = 4f;
+    [Header("Target Konfigurasi")]
+    public Transform playerTransform; 
 
-    private Animator animator;
+    [Header("Aturan Jarak AI")]
+    public float attackDistance = 3.0f; 
+    
+    [Header("Aturan Serangan")]
+    public float attackCooldown = 1.5f; 
+    private float nextAttackTime = 0f;  
+
+    [Header("Mekanik Lompat (Leap Parabola)")]
+    public float leapSpeed = 7.0f;      
+    public float leapHeight = 5.0f;     
+    private bool isLeaping = false;     
+    private Vector3 leapStartPosition;  
+    private Vector3 leapTargetPosition; 
+    private float leapProgress = 0f;    
+
+    [Header("Kustomisasi Kecepatan Animasi")]
+    [Range(0.1f, 2.0f)] 
+    public float runAnimationSpeed = 0.5f; 
+
+    [Header("Audio (Sama Seperti ZombieAI)")]
+    public AudioSource audioSource;
+    public AudioClip idleSound;
+    public AudioClip chaseSound;
+    public AudioClip attackSound;
+    private AudioClip currentClip;
+
+    [Header("Volume Settings")]
+    [Range(0f, 1f)] public float idleVolume = 0.3f;  // Boss dibuat sedikit lebih keras
+    [Range(0f, 1f)] public float chaseVolume = 0.8f;
+    [Range(0f, 1f)] public float attackVolume = 1f;
+
+    [Header("3D Audio Distance")]
+    public float minAudioDistance = 5f;
+    public float maxAudioDistance = 40f;
+
+    // Sistem State untuk sinkronisasi Audio
+    public enum BossState { Idle, Chase, Attack, Dead }
+    private BossState currentBossState;
+
     private NavMeshAgent agent;
-    private Transform player;
-
-    private float currentHp;
-    private bool isRageMode = false;
-    private bool hasRoared = false;
+    private Animator animator;
+    private ZombieBossHealth bossHealth; 
+    private float originalAcceleration; 
+    private bool isRaging = false;
+    private bool isScreaming = false;
     private bool isDead = false;
-    private float leapTimer = 0f;
 
     void Start()
     {
-        animator = GetComponent<Animator>();
         agent = GetComponent<NavMeshAgent>();
+        animator = GetComponent<Animator>();
+        bossHealth = GetComponent<ZombieBossHealth>();
 
-        GameObject playerObj = GameObject.FindWithTag("Player");
+        // Setup komponen audio otomatis jika kosong (Sama seperti ZombieAI)
+        if (audioSource == null) audioSource = GetComponent<AudioSource>();
 
-        if (playerObj != null)
+        if (audioSource != null)
         {
-            player = playerObj.transform;
+            audioSource.playOnAwake = false;
+            audioSource.loop = false;
+            audioSource.spatialBlend = 1f; // Paksa jadi 3D Audio
+            audioSource.minDistance = minAudioDistance;
+            audioSource.maxDistance = maxAudioDistance;
+            audioSource.rolloffMode = AudioRolloffMode.Logarithmic;
         }
 
-        currentHp = maxHp;
+        GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+        if (playerObj != null) playerTransform = playerObj.transform;
+
+        currentBossState = BossState.Idle;
     }
 
     void Update()
     {
-        if (isDead) return;
-        if (player == null) return;
+        if (isDead || (bossHealth != null && bossHealth.IsDead) || animator == null || agent == null || playerTransform == null) return;
 
-        // TEST DAMAGE DENGAN TOMBOL H
-        if (Input.GetKeyDown(KeyCode.H))
+        // --- 1. LOGIKA FISIK PARABOLA SAAT LOMPAT ---
+        if (isLeaping)
         {
-            TakeDamage(50f);
+            agent.enabled = false; 
+
+            float totalDistance = Vector3.Distance(leapStartPosition, leapTargetPosition);
+            if (totalDistance > 0)
+            {
+                leapProgress += (leapSpeed * Time.deltaTime) / totalDistance;
+            }
+            else
+            {
+                leapProgress = 1f;
+            }
+
+            leapProgress = Mathf.Clamp01(leapProgress);
+
+            Vector3 currentPosition = Vector3.Lerp(leapStartPosition, leapTargetPosition, leapProgress);
+            float heightOffset = Mathf.Sin(leapProgress * Mathf.PI) * leapHeight;
+            currentPosition.y += heightOffset;
+
+            transform.position = currentPosition;
+
+            if (leapProgress >= 1.0f)
+            {
+                isLeaping = false;
+                agent.enabled = true; 
+                currentBossState = BossState.Chase; // Kembali ke state mengejar setelah melompat
+                Debug.Log("Tester Log: Mutant mendarat di tanah!");
+            }
+            return; 
         }
 
-        float dist = Vector3.Distance(transform.position, player.position);
-        bool moving = agent.velocity.magnitude > 0.1f;
-        bool inRange = dist < attackRange;
-
-        animator.SetFloat("hp", currentHp);
-        animator.SetBool("isMoving", moving);
-        animator.SetBool("inRange", inRange);
-
-        // Mengejar player
-        if (!inRange)
-        {
-            agent.SetDestination(player.position);
-        }
-
-        // Aktifkan Rage Mode saat HP <= 150
-        if (!isRageMode && currentHp <= 150f)
-        {
-            isRageMode = true;
-            agent.speed = baseSpeed * 2f;
-
-            Debug.Log("RAGE MODE AKTIF!");
-        }
-
-        // Leap Attack otomatis saat Rage Mode
-        leapTimer -= Time.deltaTime;
-
-        if (isRageMode &&
-            dist >= leapMinRange &&
-            dist <= leapMaxRange &&
-            leapTimer <= 0f)
-        {
-            animator.SetTrigger("leapTrigger");
-            leapTimer = leapCooldown;
-        }
-    }
-
-    public void TakeDamage(float dmg)
-    {
-        if (isDead) return;
-
-        currentHp -= dmg;
-
-        if (currentHp < 0f)
-        {
-            currentHp = 0f;
-        }
-
-        Debug.Log("Boss HP: " + currentHp + " / " + maxHp);
-
-        if (currentHp <= 0f)
-        {
-            StartCoroutine(OnDeath());
-        }
-    }
-
-    // Dipanggil dari Animation Event pada animasi Roar
-    public void OnRoarComplete()
-    {
-        hasRoared = true;
-        animator.SetBool("hasRoared", true);
-    }
-
-    System.Collections.IEnumerator OnDeath()
-    {
-        isDead = true;
-
-        if (agent != null)
+        // --- 2. JEDA PENGAMAN SAAT BERTERIAK ---
+        if (isScreaming)
         {
             agent.isStopped = true;
+            agent.velocity = Vector3.zero;
+            return;
         }
 
-        Debug.Log("BOSS MATI");
+        // --- 3. MEMBACA INPUT KEYBOARD UNTUK DEMO ---
+        if (Input.GetKeyDown(KeyCode.Alpha3) && !isRaging && !isScreaming)
+        {
+            StartCoroutine(TriggerRageModeRoutine());
+        }
 
-        yield return new WaitForSeconds(2.5f);
+        if (Input.GetKeyDown(KeyCode.Alpha5) && !isScreaming)
+        {
+            StartCoroutine(TriggerLeapAttackRoutine());
+        }
 
-        gameObject.SetActive(false);
+        // --- 4. ENGINE STATE UTUK AUDIO & NAVMESH (MENGADOPTI ZOMBIEAI) ---
+        float distanceToPlayer = Vector3.Distance(transform.position, playerTransform.position);
+        agent.SetDestination(playerTransform.position);
+
+        if (distanceToPlayer <= attackDistance)
+        {
+            currentBossState = BossState.Attack;
+        }
+        else
+        {
+            currentBossState = BossState.Chase;
+        }
+
+        // Eksekusi aksi berdasarkan state saat ini
+        switch (currentBossState)
+        {
+            case BossState.Idle:
+                PlayStateSound(idleSound, idleVolume);
+                break;
+
+            case BossState.Chase:
+                PlayStateSound(chaseSound, chaseVolume);
+                agent.isStopped = false;
+                animator.speed = runAnimationSpeed;
+
+                if (isRaging) animator.Play("run1");
+                else animator.Play("run2");
+                break;
+
+            case BossState.Attack:
+                agent.isStopped = true;
+                Vector3 targetPosition = new Vector3(playerTransform.position.x, transform.position.y, playerTransform.position.z);
+                transform.LookAt(targetPosition);
+
+                if (Time.time >= nextAttackTime)
+                {
+                    nextAttackTime = Time.time + attackCooldown;
+                    
+                    // Mainkan suara pukul instan (Sama seperti ZombieAI)
+                    if (audioSource != null && attackSound != null) 
+                        audioSource.PlayOneShot(attackSound, attackVolume);
+
+                    animator.speed = 1.0f; 
+                    animator.Play("attack1");
+                    
+                    // Berikan damage ke player jika komponen kesehatan player ada
+                    PlayerHealth playerHealth = playerTransform.GetComponent<PlayerHealth>();
+                    if (playerHealth != null) playerHealth.TakeDamage(25); // Boss damage diatur 25
+                }
+                break;
+        }
+    }
+
+    // Fungsi pengatur sirkulasi Audio Looping (Sama persis seperti ZombieAI)
+    void PlayStateSound(AudioClip clip, float volume)
+    {
+        if (audioSource == null || clip == null || currentClip == clip) return;
+        currentClip = clip;
+        audioSource.Stop();
+        audioSource.clip = clip;
+        audioSource.loop = true;
+        audioSource.volume = volume;
+        audioSource.pitch = Random.Range(0.85f, 1.05f); // Pitch dibuat sedikit lebih berat untuk suara Boss
+        audioSource.Play();
+    }
+
+    IEnumerator TriggerRageModeRoutine()
+    {
+        isScreaming = true;
+        agent.isStopped = true;
+        agent.velocity = Vector3.zero;
+        agent.acceleration = 0; 
+        animator.speed = 1.0f;
+
+        // Saat berteriak keras, paksa mainkan sound attack/scream jika ada
+        if (audioSource != null && attackSound != null) audioSource.PlayOneShot(attackSound, attackVolume);
+
+        Debug.Log("<color=red>Tester Log: Memutar animasi state 'rage' bawaan MonsterMutant7!</color>");
+        animator.Play("rage");
+
+        yield return new WaitForSeconds(3.0f);
+
+        isScreaming = false;
+        isRaging = true; 
+        
+        agent.isStopped = false;
+        agent.acceleration = originalAcceleration;
+        agent.speed = 6.0f; 
+        attackCooldown = 1.0f; 
+    }
+
+    IEnumerator TriggerLeapAttackRoutine()
+    {
+        currentBossState = BossState.Idle;
+        agent.isStopped = true;
+        agent.velocity = Vector3.zero;
+        agent.acceleration = 0;
+
+        leapStartPosition = transform.position;
+        leapTargetPosition = new Vector3(playerTransform.position.x, transform.position.y, playerTransform.position.z);
+        leapProgress = 0f; 
+        
+        transform.LookAt(leapTargetPosition);
+
+        animator.speed = 1.0f;
+        animator.Play("idle1");
+        yield return new WaitForSeconds(0.4f); 
+
+        animator.Play("jump");
+        isLeaping = true; 
+
+        yield return new WaitForSeconds(1.5f);
+
+        isLeaping = false;
+        if (!agent.enabled) agent.enabled = true; 
+        agent.isStopped = false;
+        agent.acceleration = originalAcceleration;
+    }
+
+    public void TriggerBossDeath()
+    {
+        isDead = true;
+        currentBossState = BossState.Dead;
+        if (audioSource != null) audioSource.Stop();
+        
+        if (!agent.enabled) agent.enabled = true;
+        agent.isStopped = true;
+        agent.enabled = false; 
+        
+        animator.speed = 1.0f;
+        animator.Play("death1");
+        Debug.Log("<color=green>Tester Log: Boss mati menggunakan state death1!</color>");
     }
 }

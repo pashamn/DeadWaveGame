@@ -9,6 +9,8 @@ public class ZombieSpawner : MonoBehaviour
 
     [Header("Zombie Prefab & Loot")]
     public GameObject zombiePrefab;
+    [Tooltip("Tarik master Prefab Zombie Boss (MonsterMutant7) kalian ke sini")]
+    public GameObject bossPrefab; // BARU: Slot untuk menampung master Prefab Boss
     [Tooltip("Tarik master Prefab Box Peluru Bermagnet ke sini")]
     public GameObject ammoBoxPrefab;        
     [Tooltip("Tarik master Prefab Medkit Bermagnet ke sini")]
@@ -16,6 +18,8 @@ public class ZombieSpawner : MonoBehaviour
 
     [Header("Wave Settings")]
     public int currentWave = 1;
+    [Tooltip("Tentukan Wave berapa Boss Utama akan muncul")]
+    public int finalWaveNumber = 3; // BARU: Pengunci pintu tantangan Final Wave
     public int zombiesToSpawn = 10; 
     public int maxZombiesAlive = 3;
     public float spawnRate = 2f;
@@ -51,6 +55,7 @@ public class ZombieSpawner : MonoBehaviour
     private int zombiesKilled;
     private int totalScore = 0;             
     private bool isWaveActive = false;      
+    private bool isBossSpawnedInFinalWave = false; // BARU: Gembok agar Boss hanya keluar tepat 1 kali
 
     private int upgradePointsAvailable = 0; 
     private List<int> currentRolledUpgrades = new List<int>(); 
@@ -149,11 +154,27 @@ public class ZombieSpawner : MonoBehaviour
             zombiesToSpawn = 10; 
         }
 
+        // BARU: Jika masuk Final Wave, ubah kuota zombie dan tampilkan peringatan horror
+        if (currentWave >= finalWaveNumber)
+        {
+            isBossSpawnedInFinalWave = false;
+            zombiesToSpawn = 15; // Contoh: 1 Boss + 14 Kroco Pengawal
+            if (countdownCanvasObject != null) countdownCanvasObject.SetActive(true);
+            if (countdownUIText != null) countdownUIText.text = "BOSS MUNCUL!";
+            Invoke(nameof(HideFinalWaveAlert), 4f);
+        }
+
         Debug.Log($"DeadWave Log: WAVE {currentWave} DIMULAI! Target: {zombiesToSpawn} Zombie.");
         UpdateWaveUI(); 
         UpdateZombieLeftUI();
 
         StartCoroutine(SpawnZombieRoutine());
+    }
+
+    private void HideFinalWaveAlert()
+    {
+        if (countdownUIText != null) countdownUIText.text = "";
+        if (countdownCanvasObject != null) countdownCanvasObject.SetActive(false);
     }
 
     private IEnumerator SpawnZombieRoutine()
@@ -165,8 +186,18 @@ public class ZombieSpawner : MonoBehaviour
 
             if (activeZombies.Length < maxZombiesAlive)
             {
-                SpawnZombie();
-                zombiesSpawned++;
+                // BARU: Logika peniupan terompet Boss Final Wave
+                if (currentWave >= finalWaveNumber && !isBossSpawnedInFinalWave)
+                {
+                    SpawnBoss();
+                    isBossSpawnedInFinalWave = true;
+                    zombiesSpawned++;
+                }
+                else
+                {
+                    SpawnZombie();
+                    zombiesSpawned++;
+                }
                 UpdateZombieLeftUI();
             }
 
@@ -189,7 +220,18 @@ public class ZombieSpawner : MonoBehaviour
         if (zombiesSpawned >= zombiesToSpawn && activeZombies.Length == 0 && zombiesToSpawn > 0)
         {
             isWaveActive = false; 
-            StartCoroutine(WaveClearRoutine());
+
+            // BARU: Tamatkan permainan jika Final Wave sukses dibersihkan bersih
+            if (currentWave >= finalWaveNumber)
+            {
+                if (countdownCanvasObject != null) countdownCanvasObject.SetActive(true);
+                if (countdownUIText != null) countdownUIText.text = "CONGRATULATIONS! GAME CLEAR!";
+                Time.timeScale = 0.2f; // Efek lambat kemenangan yang dramatis saat dinilai dosen
+            }
+            else
+            {
+                StartCoroutine(WaveClearRoutine());
+            }
         }
     }
 
@@ -204,9 +246,31 @@ public class ZombieSpawner : MonoBehaviour
         Instantiate(zombiePrefab, randomPosition, Quaternion.identity);
     }
 
+    // BARU: Fungsi internal pembuat bodi Boss di arena pertempuran
+    void SpawnBoss()
+    {
+        Vector3 randomPosition = transform.position + new Vector3(
+            Random.Range(-2f, 2f),
+            0,
+            Random.Range(-2f, 2f)
+        );
+
+        if (bossPrefab != null)
+        {
+            GameObject bossObj = Instantiate(bossPrefab, randomPosition, Quaternion.identity);
+            bossObj.tag = "Zombie"; // Paksa tag menjadi Zombie agar sinkron dengan baris penghitung sisa musuh
+            Debug.Log("<color=purple>DeadWave Log: Master Boss Tercipta di Peta!</color>");
+        }
+        else
+        {
+            Debug.LogError("Spawner Error: Prefab Boss belum ditarik ke dalam slot ZombieSpawner!");
+        }
+    }
+
     public void RegisterZombieDeath()
     {
         zombiesKilled++;
+        AddScore(100); // BARU: Tambah EXP/Score otomatis tiap kali musuh mati
 
         if (currentWave == 1)
         {
@@ -230,7 +294,6 @@ public class ZombieSpawner : MonoBehaviour
         }
     }
 
-    // COROUTINE TUTORIAL: Memunculkan quest, menyalakan panel WeaponSuggest, dan freeze game 5 detik nyata
     private IEnumerator ShowQuestAndFreezeRoutine(string questMessage, int routeID)
     {
         if (questUIText != null) questUIText.text = questMessage;
@@ -520,7 +583,18 @@ public class ZombieSpawner : MonoBehaviour
 
     private void UpdateWaveUI()
     {
-        if (waveUIText != null) waveUIText.text = $"Wave {currentWave}";
+        if (waveUIText != null)
+        {
+            // Jika wave saat ini sudah mencapai atau melewati batas finalWaveNumber
+            if (currentWave >= finalWaveNumber)
+            {
+                waveUIText.text = "Final Wave"; // Ubah tampilan teks Canvas menjadi "Final Wave"
+            }
+            else
+            {
+                waveUIText.text = $"Wave {currentWave}"; // Wave biasa tetap menampilkan angka
+            }
+        }
     }
 
     public void AddScore(int amount)
