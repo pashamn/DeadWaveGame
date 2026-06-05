@@ -2,35 +2,56 @@ using UnityEngine;
 
 public class DeadWaveAmmoPickup : MonoBehaviour
 {
+    public enum PickupType { AmmoOnly, MedkitOnly }
+
+    [Header("Tipe Item")]
+    public PickupType jenisItem = PickupType.AmmoOnly;
+
     [Header("Pengaturan Amunisi")]
-    public int ammoAmount = 30; // Jumlah peluru yang didapat saat kotak ini diambil
+    public int ammoAmount = 30; 
+
+    [Header("Pengaturan Medkit")]
+    public int healAmount = 25; 
 
     [Header("Efek Visual (Opsional)")]
-    public GameObject pickupEffectPrefab; // Efek partikel saat kotak diambil
+    public GameObject pickupEffectPrefab; 
+    public float rotationSpeed = 40f;     
+
+    private void Update()
+    {
+        transform.Rotate(Vector3.up * rotationSpeed * Time.deltaTime, Space.World);
+    }
 
     private void OnTriggerEnter(Collider other)
     {
-        // Cek apakah objek yang menabrak kotak ini adalah Player
         if (other.CompareTag("Player"))
         {
-            // Cari script manager senjata di tubuh player
             PlayerWeaponCameraManager weaponManager = other.GetComponent<PlayerWeaponCameraManager>();
+            PlayerHealth playerHealth = other.GetComponent<PlayerHealth>();
 
-            if (weaponManager != null)
+            if (jenisItem == PickupType.AmmoOnly && weaponManager != null)
             {
-                // Eksekusi fungsi penambah peluru cadangan yang sudah kita buat di script player
                 weaponManager.AddCarriableAmmo(ammoAmount);
+                ExecutePickupEffect();
+            }
+            else if (jenisItem == PickupType.MedkitOnly && playerHealth != null && !playerHealth.IsDead)
+            {
+                if (playerHealth.currentHealth >= playerHealth.maxHealth) return;
 
-                // Munculkan efek partikel pickup jika ada
-                if (pickupEffectPrefab != null)
-                {
-                    GameObject fx = Instantiate(pickupEffectPrefab, transform.position, transform.rotation);
-                    Destroy(fx, 1f);
-                }
-
-                // Hancurkan kotak peluru di tanah agar tidak bisa diambil berkali-kali
-                Destroy(gameObject);
+                int newHealth = playerHealth.currentHealth + healAmount;
+                playerHealth.SetHealthFromSpawner(newHealth);
+                ExecutePickupEffect();
             }
         }
+    }
+
+    private void ExecutePickupEffect()
+    {
+        if (pickupEffectPrefab != null)
+        {
+            GameObject fx = Instantiate(pickupEffectPrefab, transform.position, transform.rotation);
+            Destroy(fx, 1f);
+        }
+        Destroy(gameObject);
     }
 }

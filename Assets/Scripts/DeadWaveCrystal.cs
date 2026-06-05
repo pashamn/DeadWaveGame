@@ -2,30 +2,38 @@ using UnityEngine;
 
 public class DeadWaveCrystal : MonoBehaviour
 {
-    [Header("Pengaturan EXP/Score")]
-    public int scoreValue = 100;       // Jumlah skor yang didapat
-    public float magnetRadius = 5f;    // Jarak aman kristal mulai menyedot player
-    public float flySpeed = 8f;        // Kecepatan terbang kristal menuju player
+    public enum LootType { AmmoBox, Medkit }
 
-    [Header("Pengaturan Tambahan Peluru (RANDOM)")]
-    [Tooltip("Jumlah peluru MINIMAL yang bisa didapatkan")]
-    public int minAmmoToGrant = 10;    
-    
-    [Tooltip("Jumlah peluru MAKSIMAL yang bisa didapatkan")]
+    [Header("Tipe Kotak Loot")]
+    public LootType jenisLoot = LootType.AmmoBox;
+
+    [Header("Pengaturan Magnet GPS")]
+    public float magnetRadius = 5f;    
+    public float flySpeed = 8f;        
+
+    [Header("Bonus Skor (EXP)")]
+    public int scoreValue = 100;       
+
+    [Header("Jika Berisi Peluru (Ammo Settings)")]
+    public int minAmmoToGrant = 15;    
     public int maxAmmoToGrant = 30;    
 
+    [Header("Jika Berisi Medkit (Health Settings)")]
+    public int healAmount = 25;
+
     private Transform playerTransform;
-    private PlayerWeaponCameraManager playerWeaponManager; // Referensi komponen senjata player
+    private PlayerWeaponCameraManager playerWeaponManager; 
+    private PlayerHealth playerHealth;
     private bool isFlying = false;
 
     private void Start()
     {
-        // Cari objek player secara otomatis lewat Tag
         GameObject player = GameObject.FindGameObjectWithTag("Player");
         if (player != null)
         {
             playerTransform = player.transform;
             playerWeaponManager = player.GetComponent<PlayerWeaponCameraManager>();
+            playerHealth = player.GetComponent<PlayerHealth>();
         }
     }
 
@@ -33,50 +41,64 @@ public class DeadWaveCrystal : MonoBehaviour
     {
         if (playerTransform == null) return;
 
-        // Hitung jarak antara kristal dan player
+        // --- GERBANG PENGAMAN BARU (ANTI-SEDOT JIKA BELUM PUNYA SENJATA) ---
+        if (jenisLoot == LootType.AmmoBox)
+        {
+            // Cek apakah player sudah membuka gembok senjata api (hasFirearm)
+            if (playerWeaponManager != null && !playerWeaponManager.hasFirearm)
+            {
+                // Jika belum punya AK74, kunci magnetnya agar kotak peluru tetap diam di lantai
+                isFlying = false;
+                return; 
+            }
+        }
+        // -------------------------------------------------------------------
+
         float distanceToPlayer = Vector3.Distance(transform.position, playerTransform.position);
 
-        // Jika player masuk radius magnet, aktifkan mode terbang
+        // PENGAMAN MEDKIT: Jika darah player sudah penuh, medkit tidak akan menyedot
+        if (jenisLoot == LootType.Medkit && playerHealth != null && playerHealth.currentHealth >= playerHealth.maxHealth)
+        {
+            isFlying = false;
+            return; 
+        }
+
+        // Jika lolos semua pengaman dan masuk radius, aktifkan magnet terbang
         if (distanceToPlayer <= magnetRadius)
         {
             isFlying = true;
         }
 
-        // Proses terbang menyedot ke tubuh player
         if (isFlying)
         {
-            // Terbang ke arah dada player (ditambah sedikit posisi Y-nya)
-            Vector3 targetPosition = playerTransform.position + Vector3.up * 1f;
+            Vector3 targetPosition = playerTransform.position + Vector3.up * 1f; 
             transform.position = Vector3.MoveTowards(transform.position, targetPosition, flySpeed * Time.deltaTime);
 
-            // Jika sudah sangat dekat dengan player, hancurkan dan tambah skor + peluru
             if (Vector3.Distance(transform.position, targetPosition) < 0.2f)
             {
-                CollectCrystal();
+                ExecuteAutoUseLoot();
             }
         }
     }
 
-    private void CollectCrystal()
+    private void ExecuteAutoUseLoot()
     {
-        // 1. Tambah skor ke ZombieSpawner
         if (ZombieSpawner.Instance != null)
         {
             ZombieSpawner.Instance.AddScore(scoreValue);
         }
 
-        // 2. Tambah amunisi cadangan secara ACAK ke tas Player
-        if (playerWeaponManager != null)
+        if (jenisLoot == LootType.AmmoBox && playerWeaponManager != null)
         {
-            // Trik Random: mengacak nilai dari minAmmo hingga maxAmmo
-            // (maxAmmoToGrant + 1) digunakan karena Random.Range untuk integer tidak menyertakan angka batas atasnya
             int randomAmmoGained = Random.Range(minAmmoToGrant, maxAmmoToGrant + 1);
-
             playerWeaponManager.AddCarriableAmmo(randomAmmoGained);
-            Debug.Log($"DeadWave Log: Kristal Tersedot! +{scoreValue} EXP & +{randomAmmoGained} Peluru (Hasil Gacha).");
+        }
+        else if (jenisLoot == LootType.Medkit && playerHealth != null)
+        {
+            int newHealth = playerHealth.currentHealth + healAmount;
+            playerHealth.SetHealthFromSpawner(newHealth);
         }
 
-        // Hancurkan objek kristal dari map arena
         Destroy(gameObject);
     }
 }
