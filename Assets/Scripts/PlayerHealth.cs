@@ -1,13 +1,13 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.SceneManagement; // WAJIB: Untuk berpindah scene
+using UnityEngine.SceneManagement;
 
 public class PlayerHealth : MonoBehaviour
 {
     [Header("Health")]
     public int maxHealth = 100;
 
-    // Properti public get agar bisa dibaca oleh ZombieSpawner saat Save Progress
     public int currentHealth { get; private set; }
 
     public bool IsDead { get; private set; }
@@ -15,21 +15,21 @@ public class PlayerHealth : MonoBehaviour
     [Header("UI Status Bar")]
     public Image healthFill;
 
+    [Header("Game Over UI")]
+    public GameObject gameOverPanel;
+
+    [Tooltip("Lama tampilan Game Over sebelum kembali ke Main Menu")]
+    public float gameOverDelay = 3f;
+
     [Header("Main Menu Scene ID Settings")]
-    [Tooltip("Masukkan ID Scene Main Menu kamu dari Build Settings (biasanya 0)")]
+    [Tooltip("ID Scene Main Menu pada Build Settings")]
     public int mainMenuSceneIndex = 0;
 
-    void Start()
+    private void Start()
     {
-        // Fungsi Start bersih dari intervensi setelan darah awal
-    }
-
-    void Update()
-    {
-        // TEST DAMAGE (Tombol Space)
-        if (Input.GetKeyDown(KeyCode.Space))
+        if (gameOverPanel != null)
         {
-            TakeDamage(10);
+            gameOverPanel.SetActive(false);
         }
     }
 
@@ -55,7 +55,7 @@ public class PlayerHealth : MonoBehaviour
     {
         currentHealth = amount;
         currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
-        
+
         if (currentHealth > 0)
         {
             IsDead = false;
@@ -72,30 +72,56 @@ public class PlayerHealth : MonoBehaviour
         }
     }
 
-    void Die()
+    private void Die()
     {
+        if (IsDead)
+            return;
+
         IsDead = true;
-        Debug.Log("PLAYER DEAD - LANGSUNG KEMBALI KE MAIN MENU");
 
-        // 1. Pastikan waktu game berjalan normal (1f) agar scene baru tidak ikut membeku
-        Time.timeScale = 1f;
+        Debug.Log("PLAYER DEAD");
 
-        // 2. Matikan status pause agar script manajemen lain ikut lepas dari kondisi terkunci
+        StartCoroutine(GameOverRoutine());
+    }
+
+    private IEnumerator GameOverRoutine()
+    {
+        // Tampilkan UI Game Over
+        if (gameOverPanel != null)
+        {
+            gameOverPanel.SetActive(true);
+        }
+
+        // Tampilkan cursor
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+
+        // Freeze game
+        Time.timeScale = 0f;
+
+        // Freeze semua audio
+        AudioListener.pause = true;
+
+        // Tunggu 3 detik real time
+        yield return new WaitForSecondsRealtime(gameOverDelay);
+
+        // Reset save
+        PlayerPrefs.SetInt("IsContinuingGame", 0);
+        PlayerPrefs.DeleteKey("SavedWave");
+        PlayerPrefs.Save();
+
         if (PauseMenu.isPaused)
         {
             PauseMenu.isPaused = false;
         }
 
-        // 3. Reset data simpanan agar pemain tidak bisa curang "Continue" di wave tinggi setelah mati
-        PlayerPrefs.SetInt("IsContinuingGame", 0);
-        PlayerPrefs.DeleteKey("SavedWave"); 
-        PlayerPrefs.Save();
+        // Aktifkan kembali audio
+        AudioListener.pause = false;
 
-        // 4. Bebaskan kursor mouse total agar siap digunakan bernavigasi di Main Menu
-        Cursor.lockState = CursorLockMode.None;
-        Cursor.visible = true;
+        // Aktifkan kembali waktu
+        Time.timeScale = 1f;
 
-        // 5. Eksekusi lempar player langsung ke scene Main Menu
+        // Pindah ke Main Menu
         SceneManager.LoadScene(mainMenuSceneIndex);
     }
 }
