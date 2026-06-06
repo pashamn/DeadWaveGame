@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI; // WAJIB: Untuk mengontrol komponen UI Image bawaan Unity
+using TMPro; // WAJIB: Untuk mengontrol komponen teks angka TextMeshPro
 
 public class ZombieBossHealth : MonoBehaviour
 {
@@ -12,13 +13,13 @@ public class ZombieBossHealth : MonoBehaviour
 
     public bool IsDead { get; private set; }
 
-    [Header("UI World Space Health Bar (Sesuai Gambar Hierarchy)")]
-    [Tooltip("Tarik objek bernama 'Fill' dari Hierarchy kepala Boss ke slot ini")]
-    public Image fill; 
-    [Tooltip("Tarik objek induk bernama 'Healt' dari Hierarchy kepala Boss ke slot ini")]
-    public GameObject healt;
-
-    private Transform mainCameraTransform;
+    [Header("UI Screen Space Health Bar (DI LAYAR PEMAIN)")]
+    [Tooltip("Tarik objek bernama 'Fill' dari CANVAS UTAMA ke slot ini")]
+    public Image screenFill; 
+    [Tooltip("Tarik objek induk Utama Bar Darah Boss dari CANVAS ke slot ini")]
+    public GameObject screenBossHealthPanel;
+    [Tooltip("Tarik komponen Text (TMP) angka darah Boss dari CANVAS ke slot ini")]
+    public TextMeshProUGUI screenBossHealthText; 
 
     void Start()
     {
@@ -27,32 +28,24 @@ public class ZombieBossHealth : MonoBehaviour
         bossController = GetComponent<ZombieBossController>();
         animator = GetComponent<Animator>();
 
-        // Ambil referensi kamera utama untuk efek melayang menghadap player
-        if (Camera.main != null)
+        // 1. UTAMA: Saat Boss lahir, paksa Panel Bar Darah di layar pemain untuk AKTIF/NYALA
+        if (screenBossHealthPanel != null)
         {
-            mainCameraTransform = Camera.main.transform;
+            screenBossHealthPanel.SetActive(true);
         }
 
         // Setel tampilan awal bar darah ke posisi penuh (100% / 1f)
-        if (fill != null)
+        if (screenFill != null)
         {
-            fill.fillAmount = 1f;
+            screenFill.fillAmount = 1f;
         }
-    }
 
-    void LateUpdate()
-    {
-        // BILLBOARD EFFECT: Memaksa objek Healt di atas kepala Boss agar selalu 
-        // berputar menghadap lurus ke mata kamera Player (Anti-Miring)
-        if (healt != null && mainCameraTransform != null)
-        {
-            healt.transform.LookAt(healt.transform.position + mainCameraTransform.forward);
-        }
+        UpdateBossHealthUI(); // Perbarui teks angka pertama kali
     }
 
     void Update()
     {
-        // MANUAL TESTING DAMAGE (Tekan K di keyboard untuk mengurangi darah Boss saat demo)
+        // MANUAL TESTING DAMAGE (Tekan K di keyboard untuk mengurangi darah Boss)
         if (Input.GetKeyDown(KeyCode.K))
         {
             TakeDamage(50);
@@ -64,13 +57,17 @@ public class ZombieBossHealth : MonoBehaviour
         if (IsDead) return;
 
         currentHealth -= damage;
+        currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth); // Pengaman agar HP tidak minus
+        
         Debug.Log($"DeadWave Boss Log: HP Boss berkurang! Sisa HP: {currentHealth}");
 
-        // UPDATE UI FILL: Hitung persentase darah menggunakan pembagian float (current / max)
-        if (fill != null)
+        // UPDATE UI FILL DI LAYAR
+        if (screenFill != null)
         {
-            fill.fillAmount = (float)currentHealth / maxHealth;
+            screenFill.fillAmount = (float)currentHealth / maxHealth;
         }
+
+        UpdateBossHealthUI(); // Perbarui teks angka setiap kali boss terluka
 
         if (currentHealth > 0)
         {
@@ -80,6 +77,15 @@ public class ZombieBossHealth : MonoBehaviour
         if (currentHealth <= 0)
         {
             Die();
+        }
+    }
+
+    // Mengontrol tulisan angka HP di layar pemain
+    private void UpdateBossHealthUI()
+    {
+        if (screenBossHealthText != null)
+        {
+            screenBossHealthText.text = $"{currentHealth} / {maxHealth}";
         }
     }
 
@@ -93,17 +99,16 @@ public class ZombieBossHealth : MonoBehaviour
             bossController.TriggerBossDeath();
         }
 
-        // TAMAT INSTAN: Panggil fungsi interupsi spawner agar langsung memicu Game Clear tanpa nunggu kroco mati semua
         if (ZombieSpawner.Instance != null)
         {
             ZombieSpawner.Instance.DropLootCrystal(transform.position);
             ZombieSpawner.Instance.RegisterBossDeath();
         }
 
-        // Hancurkan/Matikan UI induk Healt melayang seketika saat Boss terkapar jatuh
-        if (healt != null)
+        // 2. MATIKAN UTAMA: Saat Boss mati total, matikan/sembunyikan Bar Darah dari layar pemain
+        if (screenBossHealthPanel != null)
         {
-            healt.SetActive(false);
+            screenBossHealthPanel.SetActive(false);
         }
 
         Destroy(gameObject, 5f);
