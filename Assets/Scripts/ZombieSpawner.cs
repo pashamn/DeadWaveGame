@@ -98,7 +98,7 @@ public class ZombieSpawner : MonoBehaviour
         else
         {
             currentWave = 1;
-            zombiesToSpawn = 10; 
+            zombiesToSpawn = 8; 
             
             if (playerObj != null)
             {
@@ -156,7 +156,7 @@ public class ZombieSpawner : MonoBehaviour
 
         if (currentWave == 1 && zombiesToSpawn <= 0)
         {
-            zombiesToSpawn = 10; 
+            zombiesToSpawn = 8; 
         }
 
         if (currentWave >= finalWaveNumber)
@@ -342,7 +342,7 @@ public class ZombieSpawner : MonoBehaviour
 
         if (DeadWaveQuestTracker.Instance != null) DeadWaveQuestTracker.Instance.ActivationWeaponRoute(routeID);
 
-        yield return new WaitForSecondsRealtime(5f);
+        yield return new WaitForSecondsRealtime(3f);
 
         Time.timeScale = 1f;
 

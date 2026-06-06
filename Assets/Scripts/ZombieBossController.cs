@@ -182,7 +182,7 @@ public class ZombieBossController : MonoBehaviour
                     
                     // Berikan damage ke player jika komponen kesehatan player ada
                     PlayerHealth playerHealth = playerTransform.GetComponent<PlayerHealth>();
-                    if (playerHealth != null) playerHealth.TakeDamage(25); // Boss damage diatur 25
+                    if (playerHealth != null) playerHealth.TakeDamage(15); // Boss damage diatur 25
                 }
                 break;
         }

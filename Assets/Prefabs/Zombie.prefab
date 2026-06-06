@@ -164,8 +164,8 @@ MonoBehaviour:
   loseChaseDistance: 22
   attackDistance: 1
   attackCooldown: 2
-  damage: 5
-  roamRadius: 8
+  damage: 3
+  roamRadius: 6
   roamTimer: 4
   updateRate: 0.25
   audioSource: {fileID: -4803297662449979680}

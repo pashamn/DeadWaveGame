@@ -28,11 +28,43 @@ public class ZombieBossHealth : MonoBehaviour
         bossController = GetComponent<ZombieBossController>();
         animator = GetComponent<Animator>();
 
-        // 1. UTAMA: Saat Boss lahir, paksa Panel Bar Darah di layar pemain untuk AKTIF/NYALA
+        // =========================================================================
+        // PENCARIAN UI CANVAS OTOMATIS (Solusi Mutlak untuk Sistem Prefab)
+        // =========================================================================
+        
+        // 1. Cari objek induk Bar Darah Boss di Canvas berdasarkan namanya
+        if (screenBossHealthPanel == null)
+        {
+            screenBossHealthPanel = GameObject.Find("BossHealthBar"); 
+        }
+
+        // 2. Jika objek induknya ketemu, cari komponen anak di dalamnya
         if (screenBossHealthPanel != null)
         {
+            // Nyalakan panelnya sesaat agar komponen di dalamnya bisa dideteksi oleh script
             screenBossHealthPanel.SetActive(true);
+
+            // Cari objek gambar merah bernama "Fill" di dalam BossHealthBar
+            if (screenFill == null)
+            {
+                Transform fillTransform = screenBossHealthPanel.transform.Find("Fill");
+                if (fillTransform != null) 
+                {
+                    screenFill = fillTransform.GetComponent<Image>();
+                }
+            }
+
+            // Cari komponen teks angka TMP yang ada di dalam BossHealthBar
+            if (screenBossHealthText == null)
+            {
+                screenBossHealthText = screenBossHealthPanel.GetComponentInChildren<TextMeshProUGUI>();
+            }
         }
+        else
+        {
+            Debug.LogError("DeadWave Boss Error: Tidak menemukan GameObject bernama 'BossHealthBar' di Canvas!");
+        }
+        // =========================================================================
 
         // Setel tampilan awal bar darah ke posisi penuh (100% / 1f)
         if (screenFill != null)
@@ -40,7 +72,8 @@ public class ZombieBossHealth : MonoBehaviour
             screenFill.fillAmount = 1f;
         }
 
-        UpdateBossHealthUI(); // Perbarui teks angka pertama kali
+        // Perbarui teks angka HP pertama kali saat Boss lahir
+        UpdateBossHealthUI(); 
     }
 
     void Update()
