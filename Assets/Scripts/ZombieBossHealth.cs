@@ -21,6 +21,14 @@ public class ZombieBossHealth : MonoBehaviour
     [Tooltip("Tarik komponen Text (TMP) angka darah Boss dari CANVAS ke slot ini")]
     public TextMeshProUGUI screenBossHealthText; 
 
+    [Header("UI World Space Health Bar (MELAYANG DI KEPALA BOSS - BARU)")]
+    [Tooltip("Tarik objek anak bernama 'Fill' dari Canvas melayang kepala Boss ke slot ini")]
+    public Image fill; 
+    [Tooltip("Tarik objek induk bernama 'Healt' (Canvas/Gambar Induk) dari kepala Boss ke slot ini")]
+    public GameObject healt;
+
+    private Transform mainCameraTransform;
+
     void Start()
     {
         currentHealth = maxHealth;
@@ -28,23 +36,24 @@ public class ZombieBossHealth : MonoBehaviour
         bossController = GetComponent<ZombieBossController>();
         animator = GetComponent<Animator>();
 
+        // Ambil referensi kamera utama untuk efek melayang menghadap player
+        if (Camera.main != null)
+        {
+            mainCameraTransform = Camera.main.transform;
+        }
+
         // =========================================================================
-        // PENCARIAN UI CANVAS OTOMATIS (Solusi Mutlak untuk Sistem Prefab)
+        // PENCARIAN UI CANVAS SCREEN SPACE OTOMATIS (Solusi Mutlak untuk Sistem Prefab)
         // =========================================================================
-        
-        // 1. Cari objek induk Bar Darah Boss di Canvas berdasarkan namanya
         if (screenBossHealthPanel == null)
         {
             screenBossHealthPanel = GameObject.Find("BossHealthBar"); 
         }
 
-        // 2. Jika objek induknya ketemu, cari komponen anak di dalamnya
         if (screenBossHealthPanel != null)
         {
-            // Nyalakan panelnya sesaat agar komponen di dalamnya bisa dideteksi oleh script
             screenBossHealthPanel.SetActive(true);
 
-            // Cari objek gambar merah bernama "Fill" di dalam BossHealthBar
             if (screenFill == null)
             {
                 Transform fillTransform = screenBossHealthPanel.transform.Find("Fill");
@@ -54,7 +63,6 @@ public class ZombieBossHealth : MonoBehaviour
                 }
             }
 
-            // Cari komponen teks angka TMP yang ada di dalam BossHealthBar
             if (screenBossHealthText == null)
             {
                 screenBossHealthText = screenBossHealthPanel.GetComponentInChildren<TextMeshProUGUI>();
@@ -62,18 +70,24 @@ public class ZombieBossHealth : MonoBehaviour
         }
         else
         {
-            Debug.LogError("DeadWave Boss Error: Tidak menemukan GameObject bernama 'BossHealthBar' di Canvas!");
+            Debug.LogWarning("DeadWave Boss Warning: Tidak menemukan GameObject bernama 'BossHealthBar' di Canvas Layar Utama!");
         }
         // =========================================================================
 
-        // Setel tampilan awal bar darah ke posisi penuh (100% / 1f)
-        if (screenFill != null)
-        {
-            screenFill.fillAmount = 1f;
-        }
+        // Setel tampilan awal kedua bar darah ke posisi penuh (100% / 1f)
+        if (screenFill != null) screenFill.fillAmount = 1f;
+        if (fill != null) fill.fillAmount = 1f;
 
-        // Perbarui teks angka HP pertama kali saat Boss lahir
         UpdateBossHealthUI(); 
+    }
+
+    void LateUpdate()
+    {
+        // BILLBOARD EFFECT: Memaksa objek 'Healt' melayang agar selalu berputar lurus menghadap kamera player
+        if (healt != null && mainCameraTransform != null)
+        {
+            healt.transform.LookAt(healt.transform.position + mainCameraTransform.forward);
+        }
     }
 
     void Update()
@@ -90,21 +104,33 @@ public class ZombieBossHealth : MonoBehaviour
         if (IsDead) return;
 
         currentHealth -= damage;
-        currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth); // Pengaman agar HP tidak minus
+        currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth); 
         
         Debug.Log($"DeadWave Boss Log: HP Boss berkurang! Sisa HP: {currentHealth}");
 
-        // UPDATE UI FILL DI LAYAR
+        float healthPercentage = (float)currentHealth / maxHealth;
+
+        // 1. UPDATE UI BAR DI LAYAR UTAMA
         if (screenFill != null)
         {
-            screenFill.fillAmount = (float)currentHealth / maxHealth;
+            screenFill.fillAmount = healthPercentage;
         }
 
-        UpdateBossHealthUI(); // Perbarui teks angka setiap kali boss terluka
+        // 2. UPDATE UI BAR MELAYANG DI ATAS KEPALA (BARU)
+        if (fill != null)
+        {
+            fill.fillAmount = healthPercentage;
+        }
+
+        UpdateBossHealthUI(); 
 
         if (currentHealth > 0)
         {
-            if (animator != null) animator.Play("gethit1");
+            // Menggunakan sistem interupsi hit kode C# teranyar agar animasi tidak bug kaku
+            if (bossController != null)
+            {
+                bossController.PlayHitAnimationDirectly();
+            }
         }
 
         if (currentHealth <= 0)
@@ -113,7 +139,6 @@ public class ZombieBossHealth : MonoBehaviour
         }
     }
 
-    // Mengontrol tulisan angka HP di layar pemain
     private void UpdateBossHealthUI()
     {
         if (screenBossHealthText != null)
@@ -138,10 +163,16 @@ public class ZombieBossHealth : MonoBehaviour
             ZombieSpawner.Instance.RegisterBossDeath();
         }
 
-        // 2. MATIKAN UTAMA: Saat Boss mati total, matikan/sembunyikan Bar Darah dari layar pemain
+        // Matikan Bar Darah Utama di Layar
         if (screenBossHealthPanel != null)
         {
             screenBossHealthPanel.SetActive(false);
+        }
+
+        // Matikan Bar Darah Melayang di Atas Kepala Boss (BARU)
+        if (healt != null)
+        {
+            healt.SetActive(false);
         }
 
         Destroy(gameObject, 5f);

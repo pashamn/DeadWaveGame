@@ -34,7 +34,7 @@ public class ZombieBossController : MonoBehaviour
     private AudioClip currentClip;
 
     [Header("Volume Settings")]
-    [Range(0f, 1f)] public float idleVolume = 0.3f;  // Boss dibuat sedikit lebih keras
+    [Range(0f, 1f)] public float idleVolume = 0.3f;  
     [Range(0f, 1f)] public float chaseVolume = 0.8f;
     [Range(0f, 1f)] public float attackVolume = 1f;
 
@@ -42,7 +42,6 @@ public class ZombieBossController : MonoBehaviour
     public float minAudioDistance = 5f;
     public float maxAudioDistance = 40f;
 
-    // Sistem State untuk sinkronisasi Audio
     public enum BossState { Idle, Chase, Attack, Dead }
     private BossState currentBossState;
 
@@ -53,6 +52,9 @@ public class ZombieBossController : MonoBehaviour
     private bool isRaging = false;
     private bool isScreaming = false;
     private bool isDead = false;
+    
+    // Variabel kunci pengaman interupsi animasi hit tanpa merubah animator
+    private bool isPlayingHitAnim = false; 
 
     void Start()
     {
@@ -60,14 +62,13 @@ public class ZombieBossController : MonoBehaviour
         animator = GetComponent<Animator>();
         bossHealth = GetComponent<ZombieBossHealth>();
 
-        // Setup komponen audio otomatis jika kosong (Sama seperti ZombieAI)
         if (audioSource == null) audioSource = GetComponent<AudioSource>();
 
         if (audioSource != null)
         {
             audioSource.playOnAwake = false;
             audioSource.loop = false;
-            audioSource.spatialBlend = 1f; // Paksa jadi 3D Audio
+            audioSource.spatialBlend = 1f; 
             audioSource.minDistance = minAudioDistance;
             audioSource.maxDistance = maxAudioDistance;
             audioSource.rolloffMode = AudioRolloffMode.Logarithmic;
@@ -77,6 +78,11 @@ public class ZombieBossController : MonoBehaviour
         if (playerObj != null) playerTransform = playerObj.transform;
 
         currentBossState = BossState.Idle;
+
+        if (agent != null)
+        {
+            originalAcceleration = agent.acceleration;
+        }
     }
 
     void Update()
@@ -110,7 +116,7 @@ public class ZombieBossController : MonoBehaviour
             {
                 isLeaping = false;
                 agent.enabled = true; 
-                currentBossState = BossState.Chase; // Kembali ke state mengejar setelah melompat
+                currentBossState = BossState.Chase; 
                 Debug.Log("Tester Log: Mutant mendarat di tanah!");
             }
             return; 
@@ -135,9 +141,8 @@ public class ZombieBossController : MonoBehaviour
             StartCoroutine(TriggerLeapAttackRoutine());
         }
 
-        // --- 4. ENGINE STATE UTUK AUDIO & NAVMESH (MENGADOPTI ZOMBIEAI) ---
+        // --- 4. ENGINE STATE UNTUK AUDIO & NAVMESH ---
         float distanceToPlayer = Vector3.Distance(transform.position, playerTransform.position);
-        agent.SetDestination(playerTransform.position);
 
         if (distanceToPlayer <= attackDistance)
         {
@@ -153,42 +158,70 @@ public class ZombieBossController : MonoBehaviour
         {
             case BossState.Idle:
                 PlayStateSound(idleSound, idleVolume);
+                agent.isStopped = true;
+                agent.velocity = Vector3.zero;
                 break;
 
             case BossState.Chase:
                 PlayStateSound(chaseSound, chaseVolume);
+                
                 agent.isStopped = false;
-                animator.speed = runAnimationSpeed;
-
-                if (isRaging) animator.Play("run1");
-                else animator.Play("run2");
+                agent.SetDestination(playerTransform.position);
+                
+                // KUNCI PENGAMAN: Jika sedang memutar animasi kaget (hit), dilarang menimpa dengan animasi lari!
+                if (!isPlayingHitAnim)
+                {
+                    animator.speed = runAnimationSpeed;
+                    if (isRaging) animator.Play("run1");
+                    else animator.Play("run2");
+                }
                 break;
 
             case BossState.Attack:
                 agent.isStopped = true;
+                agent.velocity = Vector3.zero;
+
                 Vector3 targetPosition = new Vector3(playerTransform.position.x, transform.position.y, playerTransform.position.z);
                 transform.LookAt(targetPosition);
 
-                if (Time.time >= nextAttackTime)
+                if (Time.time >= nextAttackTime && !isPlayingHitAnim)
                 {
                     nextAttackTime = Time.time + attackCooldown;
                     
-                    // Mainkan suara pukul instan (Sama seperti ZombieAI)
                     if (audioSource != null && attackSound != null) 
                         audioSource.PlayOneShot(attackSound, attackVolume);
 
                     animator.speed = 1.0f; 
                     animator.Play("attack1");
                     
-                    // Berikan damage ke player jika komponen kesehatan player ada
                     PlayerHealth playerHealth = playerTransform.GetComponent<PlayerHealth>();
-                    if (playerHealth != null) playerHealth.TakeDamage(15); // Boss damage diatur 25
+                    if (playerHealth != null) playerHealth.TakeDamage(15); 
                 }
                 break;
         }
     }
 
-    // Fungsi pengatur sirkulasi Audio Looping (Sama persis seperti ZombieAI)
+    // FUNGSI INTERUPSI BARU: Dipanggil oleh ZombieBossHealth saat peluru masuk
+    public void PlayHitAnimationDirectly()
+    {
+        if (isDead || isPlayingHitAnim || isLeaping || isScreaming) return;
+        StartCoroutine(HitAnimationRoutine());
+    }
+
+    private IEnumerator HitAnimationRoutine()
+    {
+        isPlayingHitAnim = true;
+        
+        // Kembalikan speed animator ke 1.0f agar gerakan kagetnya tidak melambat kaku
+        animator.speed = 1.0f; 
+        animator.Play("gethit1");
+
+        // Beri jeda waktu agar animasi gethit1 selesai berputar (0.4 detik sangat ideal)
+        yield return new WaitForSeconds(0.4f);
+
+        isPlayingHitAnim = false;
+    }
+
     void PlayStateSound(AudioClip clip, float volume)
     {
         if (audioSource == null || clip == null || currentClip == clip) return;
@@ -197,7 +230,7 @@ public class ZombieBossController : MonoBehaviour
         audioSource.clip = clip;
         audioSource.loop = true;
         audioSource.volume = volume;
-        audioSource.pitch = Random.Range(0.85f, 1.05f); // Pitch dibuat sedikit lebih berat untuk suara Boss
+        audioSource.pitch = Random.Range(0.85f, 1.05f); 
         audioSource.Play();
     }
 
@@ -209,7 +242,6 @@ public class ZombieBossController : MonoBehaviour
         agent.acceleration = 0; 
         animator.speed = 1.0f;
 
-        // Saat berteriak keras, paksa mainkan sound attack/scream jika ada
         if (audioSource != null && attackSound != null) audioSource.PlayOneShot(attackSound, attackVolume);
 
         Debug.Log("<color=red>Tester Log: Memutar animasi state 'rage' bawaan MonsterMutant7!</color>");
