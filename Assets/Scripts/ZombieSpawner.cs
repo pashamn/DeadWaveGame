@@ -36,6 +36,8 @@ public class ZombieSpawner : MonoBehaviour
     public GameObject waveCanvasObject;   
     [Tooltip("Tarik GameObject Parent 'WeaponSuggest' ke sini")]
     public GameObject weaponSuggestPanelObject;
+    [Tooltip("Tarik GameObject 'BossHealthBar' dari Canvas ke sini (BARU)")]
+    public GameObject bossHealthBarCanvasObject; // Variabel baru untuk mengontrol UI Bar HP Boss
 
     [Header("UI Canvas Settings")]
     public TextMeshProUGUI waveUIText;       
@@ -80,6 +82,7 @@ public class ZombieSpawner : MonoBehaviour
         if (upgradePanelObject != null) upgradePanelObject.SetActive(false); 
         if (weaponSuggestPanelObject != null) weaponSuggestPanelObject.SetActive(false); 
         if (gameClearPanelObject != null) gameClearPanelObject.SetActive(false); 
+        if (bossHealthBarCanvasObject != null) bossHealthBarCanvasObject.SetActive(false); // Sembunyikan HP Bar Boss di awal game
 
         UpdateScoreUI();
         UpdateWaveUI(); 
@@ -98,7 +101,7 @@ public class ZombieSpawner : MonoBehaviour
         else
         {
             currentWave = 1;
-            zombiesToSpawn = 8; 
+            zombiesToSpawn = 3; 
             
             if (playerObj != null)
             {
@@ -156,7 +159,7 @@ public class ZombieSpawner : MonoBehaviour
 
         if (currentWave == 1 && zombiesToSpawn <= 0)
         {
-            zombiesToSpawn = 8; 
+            zombiesToSpawn = 3; 
         }
 
         if (currentWave >= finalWaveNumber)
@@ -235,13 +238,19 @@ public class ZombieSpawner : MonoBehaviour
         }
     }
 
-    // Fungsi interupsi instan khusus saat Zombie Boss mati (Pemicu Instant Win)
     public void RegisterBossDeath()
     {
         if (currentWave >= finalWaveNumber)
         {
             isWaveActive = false;
             AddScore(500);
+
+            // Matikan Bar Darah Boss dari layar pemain saat Boss mati
+            if (bossHealthBarCanvasObject != null)
+            {
+                bossHealthBarCanvasObject.SetActive(false);
+            }
+
             TriggerGameClearVictory();
         }
     }
@@ -253,6 +262,7 @@ public class ZombieSpawner : MonoBehaviour
         if (countdownCanvasObject != null) countdownCanvasObject.SetActive(false);
         if (waveCanvasObject != null) waveCanvasObject.SetActive(false);
         if (weaponSuggestPanelObject != null) weaponSuggestPanelObject.SetActive(false);
+        if (bossHealthBarCanvasObject != null) bossHealthBarCanvasObject.SetActive(false);
 
         if (gameClearPanelObject != null)
         {
@@ -296,6 +306,12 @@ public class ZombieSpawner : MonoBehaviour
 
         if (bossPrefab != null)
         {
+            // PERBAIKAN UTAMA: Sebelum Boss dilahirkan, paksa UI Bar HP di layar menyala lebih dulu
+            if (bossHealthBarCanvasObject != null)
+            {
+                bossHealthBarCanvasObject.SetActive(true);
+            }
+
             GameObject bossObj = Instantiate(bossPrefab, randomPosition, Quaternion.identity);
             bossObj.tag = "Zombie"; 
             Debug.Log("<color=purple>DeadWave Log: Master Boss Tercipta di Peta!</color>");
@@ -530,7 +546,7 @@ public class ZombieSpawner : MonoBehaviour
     private IEnumerator WaveBreakCountdownRoutine()
     {
         currentWave++;
-        zombiesToSpawn = 10 * currentWave; 
+        zombiesToSpawn = 3 * currentWave; 
 
         if (countdownCanvasObject != null) countdownCanvasObject.SetActive(true);
         if (waveCanvasObject != null) waveCanvasObject.SetActive(false);
